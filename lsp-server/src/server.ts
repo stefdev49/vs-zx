@@ -16,6 +16,8 @@ import {
   TextDocument
 } from 'vscode-languageserver-textdocument';
 
+declare module 'syntax-definitions/keywords';
+
 import { allKeywords } from 'syntax-definitions/keywords';
 
 // Create a connection for the server, using Node's IPC as a transport.

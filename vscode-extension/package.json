@@ -3,6 +3,7 @@
   "displayName": "ZX BASIC Development Environment",
   "version": "1.0.0",
   "description": "VS Code extension for ZX Spectrum BASIC development with Interface 1 transfer",
+  "license": "MIT",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -74,7 +75,7 @@
   ],
   "main": "./out/extension.js",
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "cd .. && npm run build && cd vscode-extension && npm run compile && mkdir -p out/server out/converter out/rs232-transfer out/syntax-definitions && cp ../out/server.js out/server/ && cp ../out/index.js out/converter/ && cp ../out/index.js out/rs232-transfer/ && (cp ../syntax-definitions/keywords.js out/syntax-definitions/ || cp ../syntax-definitions/keywords.ts out/syntax-definitions/)",
     "compile": "tsc -p ./",
     "build": "tsc -p ./",
     "watch": "tsc -watch -p ./",
