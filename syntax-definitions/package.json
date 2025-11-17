@@ -1,0 +1,13 @@
+{
+  "name": "syntax-definitions",
+  "version": "1.0.0",
+  "description": "ZX BASIC syntax definitions and keywords",
+  "main": "keywords.ts",
+  "types": "keywords.ts",
+  "scripts": {
+    "build": "echo 'No build needed'"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  }
+}

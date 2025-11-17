@@ -2,11 +2,11 @@
   "name": "vs-zx",
   "private": true,
   "workspaces": [
+    "syntax-definitions",
     "lsp-server",
-    "vscode-extension",
     "converter",
     "rs232-transfer",
-    "syntax-definitions",
+    "vscode-extension",
     "tests"
   ],
   "devDependencies": {

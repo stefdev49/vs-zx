@@ -1,14 +1,14 @@
 {
-  "name": "rs232-transfer",
+  "name": "converter",
   "version": "1.0.0",
-  "description": "RS232 transfer module for ZX Spectrum",
+  "description": "ZX BASIC to binary converter",
   "main": "out/index.js",
   "scripts": {
     "build": "tsc",
     "test": "jest"
   },
   "dependencies": {
-    "serialport": "^9.0.2"
+    "syntax-definitions": "file:../syntax-definitions"
   },
   "devDependencies": {
     "@types/node": "^20.0.0"

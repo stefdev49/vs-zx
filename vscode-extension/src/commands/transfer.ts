@@ -42,7 +42,8 @@ export function register(): ExtensionContext['subscriptions'][0] {
 
       window.showInformationMessage(`Successfully transferred ${fileName} to ZX Spectrum`);
     } catch (error) {
-      window.showErrorMessage(`Transfer failed: ${error.message}`);
+      const err = error as Error;
+      window.showErrorMessage(`Transfer failed: ${err.message}`);
     }
   });
 

@@ -1,7 +1,7 @@
 // ZX BASIC Converter - converts text BASIC to tokenized binary format
 // Inspired by zmakebas
 
-import { allKeywords, basicKeywords, zx128Keywords, interface1Keywords, functions } from '../../syntax-definitions/keywords';
+import { allKeywords, basicKeywords, zx128Keywords, interface1Keywords, functions } from 'syntax-definitions/keywords';
 
 // Token mapping (standard ZX Spectrum BASIC tokens)
 const tokenMap: { [key: string]: number } = {
