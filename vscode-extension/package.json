@@ -1,0 +1,101 @@
+{
+  "name": "zx-basic-vscode-extension",
+  "displayName": "ZX BASIC Development Environment",
+  "version": "1.0.0",
+  "description": "VS Code extension for ZX Spectrum BASIC development with Interface 1 transfer",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Languages",
+    "Other"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "zx-basic",
+        "aliases": ["ZX BASIC", "zx-basic"],
+        "extensions": [".bas", ".zxbas"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "zx-basic",
+        "scopeName": "source.zx-basic",
+        "path": "./out/syntaxes/zx-basic.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "zx-basic.transfer",
+        "title": "Transfer to ZX Spectrum",
+        "category": "ZX BASIC"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "zx-basic.transfer",
+          "when": "editorLangId == zx-basic"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "zx-basic.transfer",
+          "alt": "zx-basic.transfer",
+          "when": "editorLangId == zx-basic",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": [
+      {
+        "title": "ZX BASIC",
+        "properties": {
+          "zx-basic.serialPort": {
+            "type": "string",
+            "default": "/dev/ttyUSB0",
+            "description": "The serial port for RS232 transfer"
+          },
+          "zx-basic.baudRate": {
+            "type": "number",
+            "default": 9600,
+            "enum": [9600, 19200, 38400],
+            "description": "Baud rate for RS232 communication"
+          }
+        }
+      }
+    ]
+  },
+  "activationEvents": [
+    "onLanguage:zx-basic",
+    "onCommand:zx-basic.transfer"
+  ],
+  "main": "./out/extension.js",
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.0",
+    "serialport": "^12.0.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/glob": "^8.0.0",
+    "@types/mocha": "^2.2.42",
+    "@types/node": ">=20.0.0",
+    "eslint": "^8.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "glob": "^8.0.0",
+    "mocha": "^10.0.0",
+    "typescript": "^4.9.0",
+    "vsce": "^2.0.0"
+  }
+}
