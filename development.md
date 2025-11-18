@@ -41,16 +41,27 @@ This is a monorepo with the following packages:
    npm test
    ```
 
-4. Package the VS Code extension (must be run from vscode-extension directory):
+4. Package the VS Code extension:
    ```bash
-   cd vscode-extension
-   npx vsce package
+   npm run package
    ```
 
-   This creates a `.vsix` file (e.g., zx-basic-vscode-extension-1.0.0.vsix) for installation.
+   This builds all components and creates a `.vsix` file (e.g., zx-basic-vscode-extension-1.0.0.vsix) in the vscode-extension directory for installation.
+
+   **Notes:**
+   - The extension excludes node_modules from the package (--no-dependencies) since dependencies like `serialport` require platform-specific installation
+   - When installing the `.vsix` file, VS Code will automatically install the required dependencies
+   - For manual testing, `code --install-extension zx-basic-vscode-extension-1.0.0.vsix`
+
+   **Alternative**: Manual packaging (must be run from vscode-extension directory):
+   ```bash
+   cd vscode-extension
+   npx vsce package --no-dependencies
+   ```
 
 ## Development Workflow
 
+### Option A: Manual Setup
 1. Start the LSP server in debug mode:
    ```bash
    cd lsp-server
@@ -60,9 +71,28 @@ This is a monorepo with the following packages:
 2. Open the project in VS Code.
 
 3. Install the extension locally:
-   - After packaging, run `code --install-extension zx-basic-vscode-extension-1.0.0.vsix`
+   - Build and package: `npm run package`
+   - Install: `code --install-extension zx-basic-vscode-extension-1.0.0.vsix`
 
 4. Edit BASIC programs with .bas extension to trigger language server.
+
+### Option B: Launch Configuration (Recommended)
+VS Code launch configurations are provided for easy extension development:
+
+1. Open the project in VS Code
+2. Go to Run & Debug view (Ctrl+Shift+D)
+3. Select one of the launch configurations:
+   - **"Launch Extension"**: Automatically compiles and launches VS Code with the extension loaded
+   - **"Launch Extension (Compiled)"**: Launches VS Code with pre-compiled extension
+4. Press F5 or click Run
+
+This starts a new VS Code instance with your ZX BASIC extension active, including:
+- Syntax highlighting for `.bas` and `.zxbas` files
+- Full token mapping support (including ZX Spectrum 128 keywords)
+- Command palette integration
+- Debug console output
+
+**Note**: The extension will be reloaded automatically when you make changes to the source code.
 
 ## Hardware Setup
 
@@ -89,12 +119,18 @@ In VS Code settings (JSON):
 
 ## Supported Features
 
-- Syntax highlighting for BASIC keywords
-- Completion of commands, functions, variables
-- Diagnostics for invalid syntax
-- RS232 transfer to ZX Spectrum
-- Support for ZX Spectrum 128K extensions
-- Support for ZX Interface 1 extensions
+- **Complete Token Mapping**: Full support for all 58 ZX Spectrum BASIC tokens (A5-FF), including Spectrum 128K keywords like SPECTRUM, PLAY, and all operators (AND, OR, <=, etc.)
+- Syntax highlighting for BASIC keywords in .bas and .zxbas files
+- Code completion for commands, functions, and variables
+- Real-time syntax diagnostics and error reporting
+- RS232 transfer to ZX Spectrum via COMMAND palette
+- Full support for ZX Spectrum 128K extensions
+- Compatibility with ZX Interface 1 extensions
+
+**Recent Enhancements:**
+- All ZX BASIC keywords now properly tokenized for accurate conversion to Spectrum binary format
+- Comprehensive token map covering functions, operators, and 128K-specific commands
+- Improved text-to-binary conversion with complete Spectrum 128 compatibility
 
 ## Dependencies
 

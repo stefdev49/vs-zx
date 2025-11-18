@@ -23,6 +23,7 @@
     "build": "npm run build --workspaces",
     "test": "npm run test --workspaces",
     "lint": "npm run lint --workspaces",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "package": "cd vscode-extension && npm version patch --no-git-tag-version --force && cd .. && npm run build && cd vscode-extension && npx vsce package --no-dependencies && echo 'VS Code extension packaged successfully in vscode-extension/'"
   }
 }

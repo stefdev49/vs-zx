@@ -25,8 +25,6 @@ export const basicKeywords: string[] = [
   'RETURN',
   'IF',
   'THEN',
-  'ELSE',
-  'END',
   'DIM',
   'READ',
   'DATA',
@@ -47,7 +45,6 @@ export const basicKeywords: string[] = [
   'PLOT',
   'DRAW',
   'CIRCLE',
-  'ELLIPSE', // Some systems have this
   'LINE',
   'CLS',
   'PAUSE',
@@ -56,10 +53,7 @@ export const basicKeywords: string[] = [
   'SCREEN$',
   'ATTR',
   'POINT',
-  'STROKE',
-  'TINT',
-  'BRIGHT',
-  'CONTRAST'
+  'STROKE'
 ];
 
 // ZX Spectrum 128K specific keywords
