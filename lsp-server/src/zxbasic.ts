@@ -265,9 +265,7 @@ export class ZXBasicLexer {
       'IN': TokenType.KEYWORD,
       'USR': TokenType.KEYWORD,
       'RND': TokenType.KEYWORD,
-      'NOT': TokenType.KEYWORD,
-      'AND': TokenType.KEYWORD,
-      'OR': TokenType.KEYWORD,
+
       'STEP': TokenType.KEYWORD
     };
 
@@ -365,37 +363,50 @@ export class ZXBasicLexer {
     const start = this.position;
     const char = this.peek();
 
+    // Check compound operators first (longest first)
     if (this.input.substr(this.position, 3).toUpperCase() === 'AND') {
       this.position += 3;
       return { type: TokenType.OPERATOR, value: 'AND', start, end: this.position, line: this.line };
-    }
-    if (this.input.substr(this.position, 2).toUpperCase() === 'OR') {
-      this.position += 2;
-      return { type: TokenType.OPERATOR, value: 'OR', start, end: this.position, line: this.line };
     }
     if (this.input.substr(this.position, 3).toUpperCase() === 'NOT') {
       this.position += 3;
       return { type: TokenType.OPERATOR, value: 'NOT', start, end: this.position, line: this.line };
     }
-
-    if (char === '<') {
-      if (this.peekNext() === '>') {
-        this.position += 2;
-        return { type: TokenType.OPERATOR, value: '<>', start, end: this.position, line: this.line };
-      } else if (this.peekNext() === '=') {
-        this.position += 2;
-        return { type: TokenType.OPERATOR, value: '<=', start, end: this.position, line: this.line };
-      }
-    } else if (char === '>') {
-      if (this.peekNext() === '=') {
-        this.position += 2;
-        return { type: TokenType.OPERATOR, value: '>=', start, end: this.position, line: this.line };
-      }
+    if (this.input.substr(this.position, 2).toUpperCase() === 'OR') {
+      this.position += 2;
+      return { type: TokenType.OPERATOR, value: 'OR', start, end: this.position, line: this.line };
     }
 
+    // Check compound comparison operators
+    if (this.input.substr(this.position, 2) === '<>') {
+      this.position += 2;
+      return { type: TokenType.OPERATOR, value: '<>', start, end: this.position, line: this.line };
+    }
+    if (this.input.substr(this.position, 2) === '<=') {
+      this.position += 2;
+      return { type: TokenType.OPERATOR, value: '<=', start, end: this.position, line: this.line };
+    }
+    if (this.input.substr(this.position, 2) === '>=') {
+      this.position += 2;
+      return { type: TokenType.OPERATOR, value: '>=', start, end: this.position, line: this.line };
+    }
+
+    // Single character operators
+    if (['+', '-', '*', '/', '^', '=', '<', '>'].includes(char)) {
+      this.advance();
+      return {
+        type: TokenType.OPERATOR,
+        value: char,
+        start,
+        end: this.position,
+        line: this.line
+      };
+    }
+
+    // Not an operator, error
     this.advance();
     return {
-      type: TokenType.OPERATOR,
+      type: TokenType.INVALID,
       value: char,
       start,
       end: this.position,
