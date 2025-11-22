@@ -33,3 +33,5 @@ coverage/
 
 # Serial port logs (if any)
 *.log
+
+extras/

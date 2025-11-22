@@ -3,14 +3,27 @@
   "version": "1.0.0",
   "description": "ZX BASIC to binary converter",
   "main": "out/index.js",
+  "bin": {
+    "zx-converter": "out/cli.js"
+  },
   "scripts": {
     "build": "tsc",
     "test": "jest"
   },
   "dependencies": {
-    "syntax-definitions": "file:../syntax-definitions"
+    "syntax-definitions": "file:../syntax-definitions",
+    "commander": "^11.1.0"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0"
+    "@types/node": "^20.0.0",
+    "@types/jest": "^29.0.0",
+    "jest": "^29.0.0",
+    "ts-jest": "^29.0.0"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "roots": ["src"],
+    "testMatch": ["**/*.spec.ts"]
   }
 }

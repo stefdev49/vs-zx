@@ -16,6 +16,8 @@ import {
   TextDocument
 } from 'vscode-languageserver-textdocument';
 
+import { ZXBasicLexer, ZXBasicParser, TokenType } from './zxbasic';
+
 declare module 'syntax-definitions/keywords';
 
 import { allKeywords } from 'syntax-definitions/keywords';
@@ -91,24 +93,53 @@ async function validateDocument(textDocument: TextDocument): Promise<void> {
   const text = textDocument.getText();
   const diagnostics: any[] = [];
 
-  // Basic validation: check for line numbers followed by BASIC code
-  const lines = text.split('\n');
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (line.length === 0) continue;
+  const lexer = new ZXBasicLexer();
+  const tokens = lexer.tokenize(text);
 
-    // Simple check: line should start with number or REM
-    const firstWord = line.split(' ')[0].toUpperCase();
-    if (!/^\d+$/.test(firstWord) && firstWord !== 'REM') {
+  // Check for lexer errors (invalid characters)
+  for (const token of tokens) {
+    if (token.type === TokenType.INVALID) {
       diagnostics.push({
-        severity: 1, // Error
+        severity: DiagnosticSeverity.Error,
         range: {
-          start: { line: i, character: 0 },
-          end: { line: i, character: line.length }
+          start: { line: token.line, character: token.start },
+          end: { line: token.line, character: token.end }
         },
-        message: 'Line number expected or REM statement',
+        message: `Invalid character: ${token.value}`,
         source: 'zx-basic'
       });
+    }
+  }
+
+  // Try to parse expressions for syntax errors
+  const parser = new ZXBasicParser(tokens);
+  const expr = parser.parseExpression();
+
+  // Simple validation: check for missing line numbers or REM
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    if (trimmed.length === 0) continue;
+
+    // Check if line starts with a number or REM
+    if (!/^\d/.test(line) && !line.toUpperCase().startsWith('REM')) {
+      // Look for the first token on this line
+      const tokensOnLine = tokens.filter(t => t.line === i && t.type !== TokenType.EOF);
+      if (tokensOnLine.length > 0) {
+        const firstToken = tokensOnLine[0];
+        if (firstToken.type !== TokenType.NUMBER && firstToken.value.toUpperCase() !== 'REM') {
+          diagnostics.push({
+            severity: DiagnosticSeverity.Warning,
+            range: {
+              start: { line: i, character: 0 },
+              end: { line: i, character: line.length }
+            },
+            message: 'Line should start with a line number or REM',
+            source: 'zx-basic'
+          });
+        }
+      }
     }
   }
 
