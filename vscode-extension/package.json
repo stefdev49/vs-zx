@@ -61,6 +61,36 @@
       {
         "title": "ZX BASIC",
         "properties": {
+          "zxBasic.model": {
+            "type": "string",
+            "enum": [
+              "48K",
+              "128K",
+              "Interface1"
+            ],
+            "default": "48K",
+            "description": "Target ZX Spectrum model for language features and validation"
+          },
+          "zxBasic.strictMode": {
+            "type": "boolean",
+            "default": false,
+            "description": "Warn about non-standard BASIC syntax and features not available in target model"
+          },
+          "zxBasic.lineNumberIncrement": {
+            "type": "number",
+            "default": 10,
+            "description": "Default increment for auto-numbering lines (e.g., 10, 20, 30...)"
+          },
+          "zxBasic.maxLineLength": {
+            "type": "number",
+            "default": 255,
+            "description": "Warn when a line exceeds this length (ZX Spectrum supports up to 255 chars)"
+          },
+          "zxBasic.uppercaseKeywords": {
+            "type": "boolean",
+            "default": true,
+            "description": "Auto-uppercase keywords on completion and formatting"
+          },
           "zx-basic.serialPort": {
             "type": "string",
             "default": "/dev/ttyUSB0",

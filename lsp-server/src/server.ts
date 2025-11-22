@@ -8,6 +8,7 @@ import {
   DidChangeConfigurationNotification,
   CompletionItem,
   CompletionItemKind,
+  InsertTextFormat,
   TextDocumentPositionParams,
   Hover,
   HoverParams,
@@ -34,12 +35,76 @@ import { TextDocument } from 'vscode-languageserver-textdocument';
 import { ZXBasicLexer, ZXBasicParser, TokenType, Token } from './zxbasic';
 import { basicKeywords, zx128Keywords, interface1Keywords, functions } from 'syntax-definitions';
 
+// Snippet completions for common patterns
+const snippets = [
+  {
+    label: 'for',
+    detail: 'FOR loop snippet',
+    insertText: 'FOR ${1:i} = ${2:1} TO ${3:10}${4:: code:: NEXT $1}',
+    kind: CompletionItemKind.Snippet
+  },
+  {
+    label: 'if',
+    detail: 'IF/THEN snippet',
+    insertText: 'IF ${1:condition} THEN ${2:statement}',
+    kind: CompletionItemKind.Snippet
+  },
+  {
+    label: 'gosub',
+    detail: 'GOSUB subroutine snippet',
+    insertText: 'GOSUB ${1:2000}${2:\n2000 REM subroutine\n${3:code}\nRETURN}',
+    kind: CompletionItemKind.Snippet
+  },
+  {
+    label: 'repeat',
+    detail: 'DO/LOOP repeat snippet',
+    insertText: '${1:10} REM repeat\n${2:code}\nGOTO $1',
+    kind: CompletionItemKind.Snippet
+  },
+  {
+    label: 'data',
+    detail: 'DATA statement snippet',
+    insertText: 'DATA ${1:value1}, ${2:value2}, ${3:value3}',
+    kind: CompletionItemKind.Snippet
+  },
+  {
+    label: 'dim',
+    detail: 'DIM array snippet',
+    insertText: 'DIM ${1:array}(${2:10})',
+    kind: CompletionItemKind.Snippet
+  },
+  {
+    label: 'input',
+    detail: 'INPUT statement snippet',
+    insertText: 'INPUT "${1:prompt}"; ${2:variable}',
+    kind: CompletionItemKind.Snippet
+  },
+  {
+    label: 'print',
+    detail: 'PRINT statement snippet',
+    insertText: 'PRINT ${1:expression}',
+    kind: CompletionItemKind.Snippet
+  }
+];
+
 interface ExampleSettings {
   maxNumberOfProblems: number;
+  model: string;
+  strictMode: boolean;
+  lineNumberIncrement: number;
+  maxLineLength: number;
+  uppercaseKeywords: boolean;
 }
 
 // The global settings, used when the `workspace/configuration` request is not supported by the client.
-const defaultSettings: ExampleSettings = { maxNumberOfProblems: 1000 };
+const defaultSettings: ExampleSettings = {
+  maxNumberOfProblems: 1000,
+  model: '48K',
+  strictMode: false,
+  lineNumberIncrement: 10,
+  maxLineLength: 255,
+  uppercaseKeywords: true
+};
 let globalSettings: ExampleSettings = defaultSettings;
 
 // The settings of all open documents.
@@ -58,9 +123,14 @@ function getDocumentSettings(resource: string): Thenable<ExampleSettings> {
   if (!documentSettings.has(resource)) {
     documentSettings.set(resource, connection.workspace.getConfiguration({
       scopeUri: resource,
-      section: 'zxBasicLanguageServer'
+      section: 'zxBasic'
     }).then(settings => ({
       maxNumberOfProblems: settings?.maxNumberOfProblems ?? defaultSettings.maxNumberOfProblems,
+      model: settings?.model ?? defaultSettings.model,
+      strictMode: settings?.strictMode ?? defaultSettings.strictMode,
+      lineNumberIncrement: settings?.lineNumberIncrement ?? defaultSettings.lineNumberIncrement,
+      maxLineLength: settings?.maxLineLength ?? defaultSettings.maxLineLength,
+      uppercaseKeywords: settings?.uppercaseKeywords ?? defaultSettings.uppercaseKeywords,
     })));
   }
   return documentSettings.get(resource)!;
@@ -302,6 +372,342 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
     });
   }
 
+  // Check for IF without THEN
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    
+    if (token.type === TokenType.KEYWORD && token.value === 'IF') {
+      // Look for THEN in the same logical line (until STATEMENT_SEPARATOR or end)
+      let foundThen = false;
+      let foundEOL = false;
+      
+      for (let j = i + 1; j < tokens.length; j++) {
+        const nextToken = tokens[j];
+        
+        // Stop at statement separator or end of tokens
+        if (nextToken.type === TokenType.STATEMENT_SEPARATOR) {
+          foundEOL = true;
+          break;
+        }
+        
+        // Check if we've reached end (different line for multi-line programs)
+        if (nextToken.line > token.line && nextToken.type === TokenType.LINE_NUMBER) {
+          foundEOL = true;
+          break;
+        }
+        
+        if (nextToken.type === TokenType.KEYWORD && nextToken.value === 'THEN') {
+          foundThen = true;
+          break;
+        }
+      }
+      
+      if (!foundThen) {
+        diagnostics.push({
+          severity: DiagnosticSeverity.Error,
+          range: {
+            start: { line: token.line, character: token.start },
+            end: { line: token.line, character: token.end }
+          },
+          message: `IF statement missing THEN keyword`,
+          source: 'zx-basic-lsp'
+        });
+      }
+    }
+  }
+
+  // Check for invalid color values (0-7 for INK, PAPER, BORDER)
+  const colorKeywords = ['INK', 'PAPER', 'BORDER'];
+  
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    
+    if (token.type === TokenType.KEYWORD && colorKeywords.includes(token.value)) {
+      // Look for the next number token as the color value
+      for (let j = i + 1; j < tokens.length; j++) {
+        const nextToken = tokens[j];
+        
+        // Stop at separators or keywords
+        if (nextToken.type === TokenType.STATEMENT_SEPARATOR ||
+            nextToken.type === TokenType.PUNCTUATION && nextToken.value === ')') {
+          break;
+        }
+        
+        if (nextToken.type === TokenType.NUMBER) {
+          const colorValue = parseInt(nextToken.value, 10);
+          let isValid = false;
+          let validRange = '';
+          
+          if (token.value === 'BORDER') {
+            // BORDER only accepts 0-7
+            isValid = colorValue >= 0 && colorValue <= 7;
+            validRange = '0-7';
+          } else if (token.value === 'INK' || token.value === 'PAPER') {
+            // INK and PAPER accept 0-7 (colors), 8 (no change), 9 (contrast)
+            isValid = (colorValue >= 0 && colorValue <= 7) || colorValue === 8 || colorValue === 9;
+            validRange = '0-7 (or 8=no change, 9=contrast)';
+          }
+          
+          if (!isValid) {
+            diagnostics.push({
+              severity: DiagnosticSeverity.Warning,
+              range: {
+                start: { line: nextToken.line, character: nextToken.start },
+                end: { line: nextToken.line, character: nextToken.end }
+              },
+              message: `Invalid color value for ${token.value}: ${colorValue}. Valid range: ${validRange}`,
+              source: 'zx-basic-lsp'
+            });
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  // Check for array dimension validation (DIM declares vs usage)
+  const dimDeclarations = new Map<string, { line: number; dimensions: number }>();
+  const arrayUsages = new Map<string, Array<{ line: number; usedDimensions: number }>>();
+  
+  // First pass: collect all DIM declarations
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    
+    if (token.type === TokenType.KEYWORD && token.value === 'DIM') {
+      // Next token should be an identifier
+      i++;
+      while (i < tokens.length && tokens[i].type !== TokenType.STATEMENT_SEPARATOR && 
+             tokens[i].type !== TokenType.EOF) {
+        const idToken = tokens[i];
+        
+        if (idToken.type === TokenType.IDENTIFIER) {
+          const arrayName = idToken.value.replace(/[$%]$/, '');
+          
+          // Count dimensions (number of commas in parentheses)
+          let dimensionCount = 0;
+          let parenStart = -1;
+          i++;
+          if (i < tokens.length && tokens[i].value === '(') {
+            parenStart = i;
+            i++;
+            let depth = 1;
+            while (i < tokens.length && depth > 0) {
+              if (tokens[i].value === '(') depth++;
+              else if (tokens[i].value === ')') depth--;
+              else if (tokens[i].value === ',' && depth === 1) dimensionCount++;
+              i++;
+            }
+            dimensionCount++; // At least one dimension
+            
+            // Check if dimension count exceeds ZX BASIC limit (max 3 dimensions)
+            if (dimensionCount > 3) {
+              diagnostics.push({
+                severity: DiagnosticSeverity.Error,
+                range: {
+                  start: { line: idToken.line, character: idToken.start },
+                  end: { line: idToken.line, character: i }
+                },
+                message: `Array '${arrayName}' declares ${dimensionCount} dimensions, but ZX BASIC maximum is 3`,
+                source: 'zx-basic-lsp'
+              });
+            }
+            
+            // Store the declaration
+            if (!dimDeclarations.has(arrayName)) {
+              dimDeclarations.set(arrayName, { line: idToken.line, dimensions: dimensionCount });
+            }
+          }
+        } else {
+          i++;
+        }
+      }
+      i--;
+    }
+  }
+  
+  // Second pass: check array usage matches declarations
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    
+    if (token.type === TokenType.IDENTIFIER) {
+      const arrayName = token.value.replace(/[$%]$/, '');
+      
+      // Check if followed by parentheses (array usage)
+      if (i + 1 < tokens.length && tokens[i + 1].value === '(') {
+        // Count dimensions in this usage
+        let usedDimensions = 0;
+        let j = i + 2;
+        let depth = 1;
+        
+        while (j < tokens.length && depth > 0) {
+          if (tokens[j].value === '(') {
+            depth++;
+          } else if (tokens[j].value === ')') {
+            depth--;
+          } else if (tokens[j].value === ',' && depth === 1) {
+            usedDimensions++;
+          }
+          j++;
+        }
+        usedDimensions++; // At least one dimension
+        
+        // Check if usage exceeds ZX BASIC limit
+        if (usedDimensions > 3) {
+          diagnostics.push({
+            severity: DiagnosticSeverity.Error,
+            range: {
+              start: { line: token.line, character: token.start },
+              end: { line: token.line, character: j }
+            },
+            message: `Array access uses ${usedDimensions} dimensions, but ZX BASIC maximum is 3`,
+            source: 'zx-basic-lsp'
+          });
+        }
+        
+        // Track usage
+        if (!arrayUsages.has(arrayName)) {
+          arrayUsages.set(arrayName, []);
+        }
+        arrayUsages.get(arrayName)!.push({ line: token.line, usedDimensions });
+      }
+    }
+  }
+  
+  // Check for mismatches between DIM and usage
+  arrayUsages.forEach((usages, arrayName) => {
+    const declaration = dimDeclarations.get(arrayName);
+    
+    if (!declaration) {
+      // Array used but not declared with DIM
+      usages.forEach(usage => {
+        diagnostics.push({
+          severity: DiagnosticSeverity.Warning,
+          range: {
+            start: { line: usage.line, character: 0 },
+            end: { line: usage.line, character: arrayName.length }
+          },
+          message: `Array '${arrayName}' used but not declared with DIM`,
+          source: 'zx-basic-lsp'
+        });
+      });
+    } else {
+      // Check dimension count
+      usages.forEach(usage => {
+        if (usage.usedDimensions !== declaration.dimensions) {
+          diagnostics.push({
+            severity: DiagnosticSeverity.Warning,
+            range: {
+              start: { line: usage.line, character: 0 },
+              end: { line: usage.line, character: arrayName.length }
+            },
+            message: `Array '${arrayName}' declared with ${declaration.dimensions} dimension(s) but used with ${usage.usedDimensions}`,
+            source: 'zx-basic-lsp'
+          });
+        }
+      });
+    }
+  });
+
+  // Type checking: validate string vs numeric operations
+  // Build a map of known variable types from assignments
+  const variableTypes = new Map<string, 'string' | 'numeric' | 'unknown'>();
+  
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    
+    // LET assignments: LET var = expression
+    if (token.type === TokenType.KEYWORD && token.value === 'LET' && i + 1 < tokens.length) {
+      const varToken = tokens[i + 1];
+      if (varToken.type === TokenType.IDENTIFIER) {
+        const varName = varToken.value.replace(/[$%]$/, '');
+        // Infer type from suffix
+        if (varToken.value.endsWith('$')) {
+          variableTypes.set(varName, 'string');
+        } else if (varToken.value.endsWith('%')) {
+          variableTypes.set(varName, 'numeric');
+        } else {
+          variableTypes.set(varName, 'numeric'); // Default to numeric without suffix
+        }
+      }
+    }
+    
+    // INPUT statements: INPUT var [, var]...
+    if (token.type === TokenType.KEYWORD && token.value === 'INPUT') {
+      i++;
+      while (i < tokens.length && tokens[i].type !== TokenType.STATEMENT_SEPARATOR && tokens[i].type !== TokenType.EOF) {
+        if (tokens[i].type === TokenType.IDENTIFIER) {
+          const varName = tokens[i].value.replace(/[$%]$/, '');
+          if (tokens[i].value.endsWith('$')) {
+            variableTypes.set(varName, 'string');
+          } else {
+            variableTypes.set(varName, 'numeric');
+          }
+        }
+        i++;
+      }
+      i--;
+    }
+    
+    // FOR loops: FOR var = ...
+    if (token.type === TokenType.KEYWORD && token.value === 'FOR' && i + 1 < tokens.length) {
+      const varToken = tokens[i + 1];
+      if (varToken.type === TokenType.IDENTIFIER) {
+        const varName = varToken.value.replace(/[$%]$/, '');
+        variableTypes.set(varName, 'numeric'); // FOR loop variables are always numeric
+      }
+    }
+  }
+  
+  // Check for type mismatches in common operations
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    
+    // Check for string concatenation with + (should be invalid in ZX BASIC, use &)
+    if (token.type === TokenType.IDENTIFIER && i + 1 < tokens.length && tokens[i + 1].value === '+') {
+      const varName = token.value.replace(/[$%]$/, '');
+      const varType = variableTypes.get(varName);
+      
+      if (varType === 'string' && token.value.endsWith('$')) {
+        // Look ahead to check what's being added
+        if (i + 2 < tokens.length) {
+          const nextToken = tokens[i + 2];
+          if (nextToken.type === TokenType.IDENTIFIER && nextToken.value.endsWith('$')) {
+            diagnostics.push({
+              severity: DiagnosticSeverity.Warning,
+              range: {
+                start: { line: token.line, character: token.start },
+                end: { line: token.line, character: token.end }
+              },
+              message: `String concatenation with + is not standard in ZX BASIC (use & or space)`,
+              source: 'zx-basic-lsp'
+            });
+          }
+        }
+      }
+    }
+    
+    // Check for numeric operations on string variables
+    if (token.type === TokenType.KEYWORD && (token.value === 'ABS' || token.value === 'SQR' || token.value === 'SIN' || token.value === 'COS') && i + 1 < tokens.length && tokens[i + 1].value === '(') {
+      // These functions require numeric arguments
+      if (i + 2 < tokens.length && tokens[i + 2].type === TokenType.IDENTIFIER) {
+        const varName = tokens[i + 2].value.replace(/[$%]$/, '');
+        const varType = variableTypes.get(varName);
+        
+        if (varType === 'string') {
+          diagnostics.push({
+            severity: DiagnosticSeverity.Warning,
+            range: {
+              start: { line: token.line, character: token.start },
+              end: { line: tokens[i + 2].line, character: tokens[i + 2].end }
+            },
+            message: `${token.value}() requires numeric argument, but ${varName}$ is a string variable`,
+            source: 'zx-basic-lsp'
+          });
+        }
+      }
+    }
+  }
+
   // Try to parse as an expression (for simple cases)
   if (tokens.length > 1 && !tokens.some(t => t.type === TokenType.EOF)) {
     const parser = new ZXBasicParser(tokens);
@@ -339,14 +745,79 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
   connection.sendDiagnostics({ uri: textDocument.uri, diagnostics: limitedDiagnostics });
 }
 
+// Context detection for intelligent completion filtering
+interface CompletionContext {
+  isAtStatementStart: boolean;
+  isInExpression: boolean;
+  isAfterLineNumberKeyword: boolean;
+  previousKeyword: string | null;
+  linePrefix: string;
+}
+
+function detectCompletionContext(lineText: string, position: number): CompletionContext {
+  const linePrefix = lineText.substring(0, position);
+  
+  // Check if we're at statement start (after line number or colon)
+  const afterLineNumber = /^\s*\d+\s*$/.test(linePrefix);
+  const afterColon = /:\s*$/.test(linePrefix);
+  const atLineStart = linePrefix.trim() === '';
+  const isAtStatementStart = afterLineNumber || afterColon || atLineStart;
+  
+  // Extract the last keyword (statement keyword, not operators)
+  const keywordPattern = /\b(IF|FOR|PRINT|INPUT|LET|DIM|GOTO|GOSUB|READ|DATA|RETURN|NEXT|ELSE)\b/gi;
+  let previousKeyword: string | null = null;
+  let match;
+  while ((match = keywordPattern.exec(linePrefix)) !== null) {
+    previousKeyword = match[1].toUpperCase();
+  }
+  
+  // Check if we're after a line number context keyword
+  const lineNumberContextKeywords = ['GOTO', 'GOSUB', 'RUN', 'LIST'];
+  let isAfterLineNumberKeyword = false;
+  for (const keyword of lineNumberContextKeywords) {
+    const keywordIndex = linePrefix.toUpperCase().lastIndexOf(keyword);
+    if (keywordIndex !== -1) {
+      const afterKeyword = linePrefix.substring(keywordIndex + keyword.length);
+      if (/^\s*\d*$/.test(afterKeyword)) {
+        isAfterLineNumberKeyword = true;
+        break;
+      }
+    }
+  }
+  
+  // Check if we're in an expression context
+  // We're in expression if we're after operators, inside parentheses, or after keywords like PRINT
+  const expressionContextKeywords = ['PRINT', 'INPUT', 'IF', 'LET', 'READ', 'RETURN', '(', '=', ',', ';'];
+  let isInExpression = false;
+  
+  for (const keyword of expressionContextKeywords) {
+    if (linePrefix.toUpperCase().includes(keyword)) {
+      // Check if there's a statement separator after (which would end expression context)
+      const afterKeywordText = linePrefix.substring(linePrefix.toUpperCase().lastIndexOf(keyword) + keyword.length);
+      if (!afterKeywordText.includes(':') || /:\s*$/.test(afterKeywordText)) {
+        isInExpression = true;
+      }
+    }
+  }
+  
+  return {
+    isAtStatementStart,
+    isInExpression,
+    isAfterLineNumberKeyword,
+    previousKeyword,
+    linePrefix
+  };
+}
+
 // Completion provider
-connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] => {
+connection.onCompletion(async (params: TextDocumentPositionParams): Promise<CompletionItem[]> => {
   const document = documents.get(params.textDocument.uri);
   if (!document) {
     return [];
   }
 
   const position = params.position;
+  const text = document.getText();
   
   // Get the current line and position
   const lineText = document.getText({
@@ -365,32 +836,201 @@ connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] =
   
   currentWord = lineText.substring(startChar + 1).toUpperCase();
 
-  // Filter keywords based on what the user is typing
-  // Combine all keywords from syntax-definitions module
-  const allKeywords = [
-    ...basicKeywords,
-    ...zx128Keywords,
-    ...interface1Keywords,
-    ...functions
-  ];
+  const completionItems: CompletionItem[] = [];
 
-  const filteredKeywords = allKeywords.filter(keyword =>
+  // Detect completion context
+  const context = detectCompletionContext(lineText, position.character);
+
+  // Handle line number completion
+  if (context.isAfterLineNumberKeyword && /^\d*$/.test(currentWord)) {
+    // Extract all line numbers from the document
+    const lexer = new ZXBasicLexer();
+    const tokens = lexer.tokenize(text);
+    const lineNumbers = new Set<string>();
+    
+    for (const token of tokens) {
+      if (token.type === TokenType.LINE_NUMBER) {
+        lineNumbers.add(token.value);
+      }
+    }
+
+    // Add line numbers as completion items
+    const sortedLineNumbers = Array.from(lineNumbers).sort((a, b) => parseInt(a) - parseInt(b));
+    for (const lineNum of sortedLineNumbers) {
+      if (lineNum.startsWith(currentWord)) {
+        completionItems.push({
+          label: lineNum,
+          kind: CompletionItemKind.Constant,
+          detail: 'Line number',
+          sortText: lineNum.padStart(4, '0') // Sort numerically
+        });
+      }
+    }
+    
+    return completionItems;
+  }
+
+  // Get document settings for model-specific filtering
+  const settings = await getDocumentSettings(params.textDocument.uri);
+
+  // Filter keywords based on what the user is typing with context awareness
+  // Build keyword list based on target model
+  let allKeywords = [...basicKeywords, ...functions];
+  
+  // Add model-specific keywords based on settings
+  if (settings.model === '128K') {
+    allKeywords = [...allKeywords, ...zx128Keywords];
+  } else if (settings.model === 'Interface1') {
+    allKeywords = [...allKeywords, ...interface1Keywords];
+  }
+  // For '48K', only include basicKeywords and functions (already done above)
+
+  // Define statement keywords (only appear at statement start)
+  const statementKeywords = new Set([
+    'LET', 'PRINT', 'INPUT', 'IF', 'FOR', 'DIM', 'GOTO', 'GOSUB', 'READ', 'DATA',
+    'RETURN', 'NEXT', 'STOP', 'CLS', 'BEEP', 'BORDER', 'INK', 'PAPER', 'FLASH',
+    'BRIGHT', 'INVERSE', 'OVER', 'PLOT', 'DRAW', 'CIRCLE', 'REM', 'RANDOMIZE',
+    'CLEAR', 'RESTORE', 'CONTINUE', 'LOAD', 'SAVE', 'VERIFY', 'MERGE', 'LPRINT',
+    'LLIST', 'COPY', 'CAT', 'FORMAT', 'MOVE', 'ERASE', 'SPECTRUM', 'PLAY', 'NET'
+  ]);
+
+  // Define expression-only keywords (only appear in expressions)
+  const expressionKeywords = new Set([
+    'AND', 'OR', 'NOT', 'TO', 'STEP', 'THEN', 'ELSE'
+  ]);
+
+  // Filter keywords based on context
+  let filteredKeywords = allKeywords.filter(keyword =>
     keyword.toLowerCase().startsWith(currentWord.toLowerCase())
   );
 
+  // Apply context-aware filtering
+  if (context.isAtStatementStart) {
+    // Only show statement keywords at statement start
+    filteredKeywords = filteredKeywords.filter(kw => 
+      statementKeywords.has(kw.toUpperCase()) || isFunction(kw)
+    );
+  } else if (context.isInExpression) {
+    // In expressions, show functions and expression operators but exclude statement keywords
+    filteredKeywords = filteredKeywords.filter(kw => {
+      const upper = kw.toUpperCase();
+      return isFunction(kw) || expressionKeywords.has(upper) || !statementKeywords.has(upper);
+    });
+  }
+
+  // Add snippet completions for matching prefixes (only at statement start)
+  if (context.isAtStatementStart || currentWord === '') {
+    snippets.forEach(snippet => {
+      if (snippet.label.toLowerCase().startsWith(currentWord.toLowerCase())) {
+        completionItems.push({
+          label: snippet.label,
+          kind: CompletionItemKind.Snippet,
+          insertText: snippet.insertText,
+          insertTextFormat: InsertTextFormat.Snippet,
+          detail: snippet.detail,
+          sortText: `a_${snippet.label}` // Sort snippets first (before keywords)
+        });
+      }
+    });
+  }
+
   // Create completion items
-  const completionItems: CompletionItem[] = filteredKeywords.map(keyword => ({
-    label: keyword,
-    kind: isFunction(keyword) ? CompletionItemKind.Function : CompletionItemKind.Keyword,
-    detail: getKeywordDetail(keyword),
-    documentation: getKeywordDocumentation(keyword),
-    sortText: keyword
-  }));
+  filteredKeywords.forEach(keyword => {
+    completionItems.push({
+      label: keyword,
+      kind: isFunction(keyword) ? CompletionItemKind.Function : CompletionItemKind.Keyword,
+      detail: getKeywordDetail(keyword),
+      documentation: getKeywordDocumentation(keyword),
+      sortText: `b_${keyword}` // Sort keywords after snippets
+    });
+  });
 
   // Add function completions with signature information
   if (currentWord.length >= 1) {
     const functionCompletions = getFunctionCompletions(currentWord);
     completionItems.push(...functionCompletions);
+  }
+
+  // Add variable and array names from the document (if not in keyword context)
+  if (!context.isAfterLineNumberKeyword && currentWord.length >= 1) {
+    const lexer = new ZXBasicLexer();
+    const tokens = lexer.tokenize(text);
+    const variableNames = new Set<string>();
+    const arrayNames = new Set<string>();
+    
+    // Track variables and array declarations
+    let i = 0;
+    while (i < tokens.length) {
+      const token = tokens[i];
+      
+      if (token.type === TokenType.KEYWORD && token.value.toUpperCase() === 'DIM' && i + 1 < tokens.length) {
+        // Extract array names from DIM declaration
+        i++;
+        while (i < tokens.length && tokens[i].type !== TokenType.STATEMENT_SEPARATOR && tokens[i].type !== TokenType.EOF) {
+          if (tokens[i].type === TokenType.IDENTIFIER) {
+            const arrayName = tokens[i].value.replace(/[$%]$/, '');
+            // Arrays are followed by parentheses
+            if (i + 1 < tokens.length && tokens[i + 1].value === '(') {
+              if (arrayName.toUpperCase().startsWith(currentWord)) {
+                arrayNames.add(arrayName);
+              }
+            }
+          }
+          i++;
+        }
+      } else if (token.type === TokenType.IDENTIFIER) {
+        // Extract the variable name (remove $ and % suffixes for tracking)
+        const varName = token.value.replace(/[$%]$/, '');
+        
+        if (varName.toUpperCase().startsWith(currentWord)) {
+          // Check if it's an array (followed by parentheses)
+          if (i + 1 < tokens.length && tokens[i + 1].value === '(') {
+            arrayNames.add(varName);
+          } else {
+            variableNames.add(varName);
+          }
+        }
+      }
+      i++;
+    }
+    
+    // Add array names first (as completion items)
+    const sortedArrays = Array.from(arrayNames).sort();
+    for (const arrayName of sortedArrays) {
+      completionItems.push({
+        label: arrayName,
+        kind: CompletionItemKind.Variable,
+        detail: 'Array',
+        sortText: `y_${arrayName}` // Sort after keywords but before scalar variables
+      });
+    }
+    
+    // Add variables as completion items (sorted alphabetically)
+    const sortedVariables = Array.from(variableNames).sort();
+    for (const varName of sortedVariables) {
+      // Don't add if already in arrays
+      if (arrayNames.has(varName)) {
+        continue;
+      }
+      
+      // Determine if it's a string or numeric variable
+      const hasStringSuffix = new RegExp(`${varName}\\$\\b`, 'i').test(text);
+      const hasIntegerSuffix = new RegExp(`${varName}%\\b`, 'i').test(text);
+      
+      let detail = 'Variable';
+      if (hasStringSuffix) {
+        detail = 'String variable ($)';
+      } else if (hasIntegerSuffix) {
+        detail = 'Integer variable (%)';
+      }
+      
+      completionItems.push({
+        label: varName,
+        kind: CompletionItemKind.Variable,
+        detail,
+        sortText: `z_${varName}` // Sort after keywords and arrays
+      });
+    }
   }
 
   return completionItems;
@@ -413,24 +1053,123 @@ connection.onHover((params: HoverParams): Hover => {
   }
 
   const position = params.position;
+  const lineStart = Math.max(0, position.line - 2);
+  const lineEnd = Math.min(document.lineCount - 1, position.line + 2);
   const text = document.getText({
-    start: { line: position.line, character: Math.max(0, position.character - 20) },
+    start: { line: lineStart, character: 0 },
+    end: { line: lineEnd, character: position.character + 50 }
+  });
+
+  // Get the current line text
+  const lineText = document.getText({
+    start: { line: position.line, character: 0 },
     end: { line: position.line, character: position.character + 20 }
   });
 
-  // Simple hover for keywords and functions
-  const wordMatch = text.match(/(\w+)\s*\(?/);
-  if (wordMatch) {
-    const word = wordMatch[1].toUpperCase();
-    const hoverText = getHoverDocumentation(word);
-    if (hoverText) {
+  // Extract word at position
+  let endChar = lineText.length - 1;
+  while (endChar >= 0 && /[A-Za-z0-9_$%]/.test(lineText[endChar])) {
+    endChar--;
+  }
+  let startChar = Math.max(0, position.character);
+  while (startChar >= 0 && /[A-Za-z0-9_$%]/.test(lineText[startChar])) {
+    startChar--;
+  }
+  
+  const word = lineText.substring(startChar + 1, position.character).toUpperCase();
+  if (!word) {
+    return { contents: [] };
+  }
+
+  // Check if it's a keyword first
+  const hoverText = getHoverDocumentation(word);
+  if (hoverText) {
+    return {
+      contents: {
+        kind: 'markdown',
+        value: `**${word}**\n\n${hoverText}`
+      }
+    };
+  }
+
+  // Check if it's a line number (hover over GOTO/GOSUB target)
+  if (/^\d+$/.test(word)) {
+    const lineNum = word;
+    const lexer = new ZXBasicLexer();
+    const allTokens = lexer.tokenize(document.getText());
+    
+    // Find the line content
+    let lineContent = '';
+    let foundLine = false;
+    for (let i = 0; i < allTokens.length; i++) {
+      if (allTokens[i].type === TokenType.LINE_NUMBER && allTokens[i].value === lineNum) {
+        foundLine = true;
+        // Collect tokens until end of line
+        i++;
+        while (i < allTokens.length && allTokens[i].type !== TokenType.EOF) {
+          if (allTokens[i].type === TokenType.STATEMENT_SEPARATOR && allTokens[i].value === ':') {
+            break;
+          }
+          lineContent += allTokens[i].value;
+          i++;
+        }
+        break;
+      }
+    }
+    
+    if (foundLine) {
       return {
         contents: {
           kind: 'markdown',
-          value: `**${word}**\n\n${hoverText}`
+          value: `**Line ${lineNum}**\n\`\`\`\n${lineNum} ${lineContent.trim()}\n\`\`\``
         }
       };
     }
+  }
+
+  // Check if it's a variable (show type based on suffix)
+  const fullLine = document.getText({
+    start: { line: position.line, character: 0 },
+    end: { line: position.line, character: 500 }
+  });
+  
+  // Look for variable type indicators
+  const varPattern = new RegExp(`\\b${word.replace(/[$%]$/, '')}[$%]?\\b`, 'g');
+  let isStringVar = false;
+  let isIntegerVar = false;
+  let isArray = false;
+  
+  const allMatches = fullLine.matchAll(varPattern);
+  for (const match of allMatches) {
+    if (match[0].endsWith('$')) {
+      isStringVar = true;
+    } else if (match[0].endsWith('%')) {
+      isIntegerVar = true;
+    }
+  }
+  
+  // Check if it's an array (followed by parentheses)
+  const arrayPattern = new RegExp(`\\b${word.replace(/[$%]$/, '')}\\s*\\(`, 'g');
+  isArray = arrayPattern.test(fullLine);
+  
+  if (isStringVar || isIntegerVar || isArray) {
+    let type = 'Variable';
+    if (isArray) {
+      type = 'Array';
+    } else if (isStringVar) {
+      type = 'String variable ($)';
+    } else if (isIntegerVar) {
+      type = 'Integer variable (%)';
+    } else {
+      type = 'Numeric variable';
+    }
+    
+    return {
+      contents: {
+        kind: 'markdown',
+        value: `**${word}**\n\nType: ${type}`
+      }
+    };
   }
 
   return { contents: [] };
@@ -448,6 +1187,20 @@ connection.onSignatureHelp((params: SignatureHelpParams): SignatureHelp => {
     start: { line: Math.max(0, position.line - 1), character: 0 },
     end: { line: position.line, character: position.character }
   });
+
+  // Check for command signatures (PRINT, INPUT, FOR, DIM, etc.)
+  const commandMatch = text.match(/^\s*(\d+\s+)?(\w+)(?:\s+|$)/);
+  if (commandMatch) {
+    const commandName = commandMatch[2].toUpperCase();
+    const commandSignature = getCommandSignatureInfo(commandName);
+    if (commandSignature) {
+      return {
+        signatures: [commandSignature],
+        activeSignature: 0,
+        activeParameter: 0
+      };
+    }
+  }
 
   // Find function calls that haven't been closed yet
   const openFunctionMatch = text.match(/(\w+)\s*\(([^)]*)$/);
@@ -1023,6 +1776,151 @@ function getFunctionSignatureInfo(functionName: string): SignatureInformation | 
   return functionSignatures[functionName.toUpperCase()];
 }
 
+// Get signature help for commands (PRINT, INPUT, FOR, etc.)
+function getCommandSignatureInfo(commandName: string): SignatureInformation | undefined {
+  const commandSignatures: { [key: string]: SignatureInformation } = {
+    'PRINT': {
+      label: 'PRINT [AT line,col;] expression [; expression]...',
+      documentation: 'Print text or expressions to the screen. Use ; for no spacing, , for spacing',
+      parameters: [
+        { label: 'expression', documentation: 'String or numeric expression to print' }
+      ]
+    },
+    'INPUT': {
+      label: 'INPUT ["prompt";] variable [, variable]...',
+      documentation: 'Read keyboard input into variables',
+      parameters: [
+        { label: 'variable', documentation: 'Variable to receive input' }
+      ]
+    },
+    'FOR': {
+      label: 'FOR variable = start TO end [STEP step]',
+      documentation: 'Begin a FOR loop. Must end with NEXT variable',
+      parameters: [
+        { label: 'variable', documentation: 'Loop control variable' },
+        { label: 'start', documentation: 'Starting value' },
+        { label: 'end', documentation: 'Ending value' }
+      ]
+    },
+    'DIM': {
+      label: 'DIM array(size [, size [, size]])',
+      documentation: 'Dimension an array (max 3 dimensions in ZX BASIC)',
+      parameters: [
+        { label: 'array', documentation: 'Array name' },
+        { label: 'size', documentation: 'Dimension size (can be 1, 2, or 3 dimensions)' }
+      ]
+    },
+    'IF': {
+      label: 'IF condition THEN statement',
+      documentation: 'Conditional execution (single statement only)',
+      parameters: [
+        { label: 'condition', documentation: 'Boolean expression' },
+        { label: 'statement', documentation: 'Statement to execute if true' }
+      ]
+    },
+    'PLOT': {
+      label: 'PLOT x, y',
+      documentation: 'Plot a pixel at screen coordinates',
+      parameters: [
+        { label: 'x', documentation: 'X coordinate (0-255)' },
+        { label: 'y', documentation: 'Y coordinate (0-175)' }
+      ]
+    },
+    'DRAW': {
+      label: 'DRAW x [, y]',
+      documentation: 'Draw a line from current position',
+      parameters: [
+        { label: 'x', documentation: 'Relative X distance' },
+        { label: 'y', documentation: 'Relative Y distance (optional)' }
+      ]
+    },
+    'BEEP': {
+      label: 'BEEP duration, pitch',
+      documentation: 'Make a beeping sound',
+      parameters: [
+        { label: 'duration', documentation: 'Duration in 1/50ths second' },
+        { label: 'pitch', documentation: 'Pitch (frequency)' }
+      ]
+    },
+    'CIRCLE': {
+      label: 'CIRCLE x, y, radius',
+      documentation: 'Draw a circle',
+      parameters: [
+        { label: 'x', documentation: 'Center X coordinate' },
+        { label: 'y', documentation: 'Center Y coordinate' },
+        { label: 'radius', documentation: 'Circle radius' }
+      ]
+    },
+    'READ': {
+      label: 'READ variable [, variable]...',
+      documentation: 'Read values from DATA statements',
+      parameters: [
+        { label: 'variable', documentation: 'Variable to receive data' }
+      ]
+    },
+    'DATA': {
+      label: 'DATA constant [, constant]...',
+      documentation: 'Define data values for READ statements',
+      parameters: [
+        { label: 'constant', documentation: 'Numeric or string constant' }
+      ]
+    },
+    'GOSUB': {
+      label: 'GOSUB line_number',
+      documentation: 'Call a subroutine (must end with RETURN)',
+      parameters: [
+        { label: 'line_number', documentation: 'Subroutine line number' }
+      ]
+    },
+    'GOTO': {
+      label: 'GOTO line_number',
+      documentation: 'Jump unconditionally to a line number',
+      parameters: [
+        { label: 'line_number', documentation: 'Target line number' }
+      ]
+    },
+    'POKE': {
+      label: 'POKE address, value',
+      documentation: 'Write a byte to memory',
+      parameters: [
+        { label: 'address', documentation: 'Memory address (0-65535)' },
+        { label: 'value', documentation: 'Byte value (0-255)' }
+      ]
+    },
+    'LET': {
+      label: 'LET variable = expression',
+      documentation: 'Assign a value to a variable (LET can be omitted)',
+      parameters: [
+        { label: 'variable', documentation: 'Variable name' },
+        { label: 'expression', documentation: 'Value to assign' }
+      ]
+    },
+    'INK': {
+      label: 'INK colour',
+      documentation: 'Set text colour (0-7, or 8=no change, 9=inverse)',
+      parameters: [
+        { label: 'colour', documentation: 'Colour code' }
+      ]
+    },
+    'PAPER': {
+      label: 'PAPER colour',
+      documentation: 'Set background colour (0-7, or 8=no change, 9=inverse)',
+      parameters: [
+        { label: 'colour', documentation: 'Colour code' }
+      ]
+    },
+    'BORDER': {
+      label: 'BORDER colour',
+      documentation: 'Set border colour (0-7)',
+      parameters: [
+        { label: 'colour', documentation: 'Colour code' }
+      ]
+    },
+  };
+
+  return commandSignatures[commandName.toUpperCase()];
+}
+
 // Document Symbols Provider - show outline of line numbers and subroutines
 connection.onDocumentSymbol((params: DocumentSymbolParams): DocumentSymbol[] => {
   const document = documents.get(params.textDocument.uri);
@@ -1038,8 +1936,10 @@ connection.onDocumentSymbol((params: DocumentSymbolParams): DocumentSymbol[] => 
   let currentLineNumber: string | null = null;
   let lineNumberToken: Token | null = null;
   const lineNumbers = new Map<string, { token: Token; hasGosub: boolean }>();
+  const defFnFunctions = new Map<string, Token>();
+  const variableDefinitions = new Map<string, Token>();
 
-  // First pass: collect all line numbers and check for GOSUB targets
+  // First pass: collect all line numbers, DEF FN functions, and variable assignments
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i];
     
@@ -1047,7 +1947,21 @@ connection.onDocumentSymbol((params: DocumentSymbolParams): DocumentSymbol[] => 
       currentLineNumber = token.value;
       lineNumberToken = token;
       lineNumbers.set(currentLineNumber, { token, hasGosub: false });
-    } else if (token.type === TokenType.KEYWORD && token.value === 'GOSUB') {
+    } else if (token.type === TokenType.KEYWORD && token.value.toUpperCase() === 'DEF FN') {
+      // Next identifier is the function name
+      if (i + 1 < tokens.length && tokens[i + 1].type === TokenType.IDENTIFIER) {
+        const fnName = tokens[i + 1].value;
+        defFnFunctions.set(fnName, tokens[i + 1]);
+      }
+    } else if (token.type === TokenType.KEYWORD && token.value.toUpperCase() === 'LET') {
+      // Variable assignment: LET varname = ...
+      if (i + 1 < tokens.length && tokens[i + 1].type === TokenType.IDENTIFIER) {
+        const varName = tokens[i + 1].value.replace(/[$%]$/, ''); // Remove type suffix
+        if (!variableDefinitions.has(varName)) {
+          variableDefinitions.set(varName, tokens[i + 1]);
+        }
+      }
+    } else if (token.type === TokenType.KEYWORD && token.value.toUpperCase() === 'GOSUB') {
       // Next number token is a GOSUB target
       for (let j = i + 1; j < tokens.length; j++) {
         if (tokens[j].type === TokenType.NUMBER || tokens[j].type === TokenType.LINE_NUMBER) {
@@ -1068,7 +1982,7 @@ connection.onDocumentSymbol((params: DocumentSymbolParams): DocumentSymbol[] => 
     }
   }
 
-  // Second pass: create symbols for line numbers
+  // Create symbols for line numbers
   lineNumbers.forEach((info, lineNum) => {
     const token = info.token;
     const range: Range = {
@@ -1087,11 +2001,65 @@ connection.onDocumentSymbol((params: DocumentSymbolParams): DocumentSymbol[] => 
     });
   });
 
-  // Sort by line number
+  // Create symbols for DEF FN functions
+  defFnFunctions.forEach((token, fnName) => {
+    const range: Range = {
+      start: { line: token.line, character: token.start },
+      end: { line: token.line, character: token.end }
+    };
+
+    symbols.push({
+      name: `${fnName}() [DEF FN]`,
+      kind: SymbolKind.Function,
+      range: range,
+      selectionRange: range
+    });
+  });
+
+  // Create symbols for variables (optional - only show if enabled or limited)
+  // Show only first 20 variables to avoid cluttering the outline
+  const variablesToShow = Array.from(variableDefinitions.entries()).slice(0, 20);
+  variablesToShow.forEach(([varName, token]) => {
+    const range: Range = {
+      start: { line: token.line, character: token.start },
+      end: { line: token.line, character: token.end }
+    };
+
+    symbols.push({
+      name: `${varName} [variable]`,
+      kind: SymbolKind.Variable,
+      range: range,
+      selectionRange: range
+    });
+  });
+
+  // Sort symbols: line numbers first, then DEF FN, then variables
   symbols.sort((a, b) => {
+    // Extract sort priorities
+    const aIsSub = a.name.includes('subroutine');
+    const bIsSub = b.name.includes('subroutine');
+    const aIsDefFn = a.name.includes('DEF FN');
+    const bIsDefFn = b.name.includes('DEF FN');
+    const aIsVar = a.name.includes('variable');
+    const bIsVar = b.name.includes('variable');
+
+    // Sort by: line numbers, subroutines, DEF FN, variables
+    if (aIsVar && !bIsVar) return 1;
+    if (!aIsVar && bIsVar) return -1;
+    if (aIsDefFn && !bIsDefFn && !aIsSub && !bIsSub) return 1;
+    if (!aIsDefFn && bIsDefFn && !aIsSub && !bIsSub) return -1;
+    if (aIsSub && !bIsSub) return -1;
+    if (!aIsSub && bIsSub) return 1;
+
+    // Sort line numbers numerically
     const aNum = parseInt(a.name.split(' ')[0]);
     const bNum = parseInt(b.name.split(' ')[0]);
-    return aNum - bNum;
+    if (!isNaN(aNum) && !isNaN(bNum)) {
+      return aNum - bNum;
+    }
+
+    // Alphabetically for others
+    return a.name.localeCompare(b.name);
   });
 
   return symbols;
@@ -1262,18 +2230,136 @@ connection.onCodeAction((params: CodeActionParams): CodeAction[] => {
     });
   }
 
-  // Check for GOSUB without matching RETURN (simplified check)
-  const gosubLines = new Set<number>();
+  // Check for GOSUB without matching RETURN
+  const gosubLines: Array<{ line: number; lineNum: string }> = [];
   const returnLines = new Set<number>();
   
-  for (const token of tokens) {
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
     if (token.type === TokenType.KEYWORD) {
       if (token.value === 'GOSUB') {
-        gosubLines.add(token.line);
+        // Get line number for context
+        let lineNum = '';
+        for (let j = i - 1; j >= 0; j--) {
+          if (tokens[j].type === TokenType.LINE_NUMBER) {
+            lineNum = tokens[j].value;
+            break;
+          }
+        }
+        gosubLines.push({ line: token.line, lineNum });
       } else if (token.value === 'RETURN') {
         returnLines.add(token.line);
       }
     }
+  }
+
+  // Offer to add RETURN at end of subroutine if GOSUB exists but no RETURN
+  if (gosubLines.length > 0 && returnLines.size === 0) {
+    const lastLine = lines.length - 1;
+    actions.push({
+      title: 'Add RETURN statement at end of subroutine',
+      kind: CodeActionKind.QuickFix,
+      edit: {
+        changes: {
+          [params.textDocument.uri]: [{
+            range: {
+              start: { line: lastLine, character: lines[lastLine].length },
+              end: { line: lastLine, character: lines[lastLine].length }
+            },
+            newText: '\nRETURN'
+          }]
+        }
+      }
+    });
+  }
+
+  // Check for FOR without matching NEXT
+  const forLines: Array<{ line: number; variable: string }> = [];
+  const nextLines = new Set<number>();
+  
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    if (token.type === TokenType.KEYWORD) {
+      if (token.value === 'FOR' && i + 1 < tokens.length && tokens[i + 1].type === TokenType.IDENTIFIER) {
+        forLines.push({ line: token.line, variable: tokens[i + 1].value });
+      } else if (token.value === 'NEXT') {
+        nextLines.add(token.line);
+      }
+    }
+  }
+
+  // Offer to add NEXT at end if FOR exists but no NEXT
+  if (forLines.length > 0 && nextLines.size === 0 && forLines.length > 0) {
+    const lastFor = forLines[forLines.length - 1];
+    const lastLine = lines.length - 1;
+    actions.push({
+      title: `Add NEXT ${lastFor.variable} statement at end`,
+      kind: CodeActionKind.QuickFix,
+      edit: {
+        changes: {
+          [params.textDocument.uri]: [{
+            range: {
+              start: { line: lastLine, character: lines[lastLine].length },
+              end: { line: lastLine, character: lines[lastLine].length }
+            },
+            newText: `\nNEXT ${lastFor.variable}`
+          }]
+        }
+      }
+    });
+  }
+
+  // Check for undeclared arrays (array usage without DIM)
+  const declaredArrays = new Set<string>();
+  const usedArrays = new Map<string, Token>();
+
+  // First pass: collect declared arrays from DIM statements
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    if (token.type === TokenType.KEYWORD && token.value.toUpperCase() === 'DIM') {
+      // Extract array names from DIM declaration
+      i++;
+      while (i < tokens.length && tokens[i].type !== TokenType.STATEMENT_SEPARATOR && tokens[i].type !== TokenType.EOF) {
+        if (tokens[i].type === TokenType.IDENTIFIER && i + 1 < tokens.length && tokens[i + 1].value === '(') {
+          const arrayName = tokens[i].value.replace(/[$%]$/, '');
+          declaredArrays.add(arrayName.toUpperCase());
+        }
+        i++;
+      }
+    }
+  }
+
+  // Second pass: find array usage
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    if (token.type === TokenType.IDENTIFIER && i + 1 < tokens.length && tokens[i + 1].value === '(') {
+      const arrayName = token.value.replace(/[$%]$/, '');
+      if (!declaredArrays.has(arrayName.toUpperCase())) {
+        usedArrays.set(arrayName.toUpperCase(), token);
+      }
+    }
+  }
+
+  // Offer to add DIM for undeclared arrays
+  if (usedArrays.size > 0) {
+    const undeclaredArrayNames = Array.from(usedArrays.keys()).slice(0, 5); // Limit to first 5
+    const dimStatement = undeclaredArrayNames.map(name => `${name}(10)`).join(', ');
+    
+    actions.push({
+      title: `Add DIM statement for undeclared array${undeclaredArrayNames.length > 1 ? 's' : ''}: ${undeclaredArrayNames.join(', ')}`,
+      kind: CodeActionKind.QuickFix,
+      edit: {
+        changes: {
+          [params.textDocument.uri]: [{
+            range: {
+              start: { line: 0, character: 0 },
+              end: { line: 0, character: 0 }
+            },
+            newText: `10 DIM ${dimStatement}\n`
+          }]
+        }
+      }
+    });
   }
 
   // Offer to uppercase all keywords
@@ -1356,7 +2442,11 @@ connection.onDocumentFormatting((params: DocumentFormattingParams): TextEdit[] =
   const tokens = lexer.tokenize(text);
   const edits: TextEdit[] = [];
 
-  // Format each line
+  // First pass: auto-renumber lines
+  const renumberEdits = autoRenumberLines(document);
+  edits.push(...renumberEdits);
+
+  // Second pass: format each line (spacing, uppercase, etc.)
   let currentLine = -1;
   let lineTokens: Token[] = [];
 
@@ -1452,6 +2542,92 @@ function formatLine(tokens: Token[], document: TextDocument): TextEdit | null {
   }
 
   return null;
+}
+
+// Helper function to auto-renumber lines
+function autoRenumberLines(document: TextDocument): TextEdit[] {
+  const edits: TextEdit[] = [];
+  const text = document.getText();
+  const lines = text.split('\n');
+  
+  // Build a mapping of old line numbers to new line numbers
+  const lineNumberMap = new Map<string, string>();
+  let lineNum = 10;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    
+    // Skip empty lines
+    if (!line.trim()) {
+      continue;
+    }
+
+    // Check if line already has a line number
+    const match = line.match(/^(\d+)\s+/);
+    if (match) {
+      const oldLineNum = match[1];
+      lineNumberMap.set(oldLineNum, lineNum.toString());
+    }
+    
+    lineNum += 10;
+  }
+
+  // Now apply the renumbering with GOTO/GOSUB target updates
+  lineNum = 10;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    
+    // Skip empty lines
+    if (!line.trim()) {
+      continue;
+    }
+
+    // Check if line already has a line number
+    const match = line.match(/^(\d+)\s+/);
+    let newLine = line;
+    
+    if (match) {
+      const oldLineNum = match[1];
+      
+      // Only update if line number doesn't match expected
+      if (oldLineNum !== lineNum.toString()) {
+        // Replace line number
+        newLine = line.replace(/^\d+\s+/, `${lineNum} `);
+      }
+    } else {
+      // Add line number to lines without one
+      newLine = `${lineNum} ${line}`;
+    }
+
+    // Now update GOTO/GOSUB targets in this line
+    for (const [oldNum, newNum] of lineNumberMap.entries()) {
+      // Match GOTO or GOSUB followed by the line number (with word boundaries and spaces)
+      const goSubPattern = new RegExp(`\\b(GOTO|GO\\s+TO|GOSUB|GO\\s+SUB)\\s+${oldNum}\\b`, 'gi');
+      newLine = newLine.replace(goSubPattern, (match, keyword) => {
+        // Preserve the keyword format (GOTO vs GO TO)
+        if (keyword.toUpperCase() === 'GOTO' || keyword.toUpperCase().replace(/\s+/g, '') === 'GOTO') {
+          return `GOTO ${newNum}`;
+        } else {
+          return `GOSUB ${newNum}`;
+        }
+      });
+    }
+    
+    // Only add edit if content changed
+    if (newLine !== line) {
+      edits.push({
+        range: {
+          start: { line: i, character: 0 },
+          end: { line: i, character: line.length }
+        },
+        newText: newLine
+      });
+    }
+    
+    lineNum += 10;
+  }
+
+  return edits;
 }
 
 documents.listen(connection);

@@ -475,7 +475,9 @@ export class ZXBasicLexer {
 
 // Simple AST node for expressions
 export interface ASTNode {
-  type: 'binary_expr' | 'unary_expr' | 'literal' | 'number' | 'string' | 'identifier' | 'function';
+  type: 'binary_expr' | 'unary_expr' | 'literal' | 'number' | 'string' | 'identifier' | 'function' |
+    'let_statement' | 'print_statement' | 'input_statement' | 'if_statement' | 'for_statement' |
+    'dim_statement' | 'goto_statement' | 'gosub_statement' | 'read_statement' | 'data_statement';
   operator?: string;
   left?: ASTNode;
   right?: ASTNode;
@@ -483,6 +485,18 @@ export interface ASTNode {
   value?: any;
   name?: string;
   args?: ASTNode[];
+  variable?: string;
+  expression?: ASTNode;
+  expressions?: ASTNode[];
+  variables?: string[];
+  condition?: ASTNode;
+  thenStatement?: ASTNode | null;
+  start?: ASTNode;
+  end?: ASTNode;
+  step?: ASTNode | null;
+  arrays?: Array<{ name: string; dimensions: ASTNode[] }>;
+  lineNumber?: string;
+  values?: Array<string | number>;
 }
 
 export class ZXBasicParser {
@@ -493,12 +507,256 @@ export class ZXBasicParser {
     this.tokens = tokens;
   }
 
+  setTokens(tokens: Token[]): void {
+    this.tokens = tokens;
+    this.current = 0;
+  }
+
   parseExpression(): ASTNode | null {
     try {
       return this.expression();
     } catch (e) {
       return null;
     }
+  }
+
+  // Parse a full statement
+  parseStatement(): ASTNode | null {
+    try {
+      const keyword = this.peek();
+      
+      if (keyword.type !== TokenType.KEYWORD) {
+        return null;
+      }
+
+      switch (keyword.value) {
+        case 'LET':
+          return this.parseLet();
+        case 'PRINT':
+          return this.parsePrint();
+        case 'INPUT':
+          return this.parseInput();
+        case 'IF':
+          return this.parseIf();
+        case 'FOR':
+          return this.parseFor();
+        case 'DIM':
+          return this.parseDim();
+        case 'GOTO':
+          return this.parseGoto();
+        case 'GOSUB':
+          return this.parseGosub();
+        case 'READ':
+          return this.parseRead();
+        case 'DATA':
+          return this.parseData();
+        default:
+          return null;
+      }
+    } catch (e) {
+      return null;
+    }
+  }
+
+  private parseLet(): ASTNode {
+    this.consume(TokenType.KEYWORD); // LET
+    const variable = this.consume(TokenType.IDENTIFIER);
+    this.consume(TokenType.EQUALS);
+    const expression = this.expression();
+    
+    return {
+      type: 'let_statement',
+      variable: variable.value,
+      expression
+    };
+  }
+
+  private parsePrint(): ASTNode {
+    this.consume(TokenType.KEYWORD); // PRINT
+    const expressions: ASTNode[] = [];
+    
+    while (!this.isAtEnd() && this.peek().type !== TokenType.STATEMENT_SEPARATOR) {
+      expressions.push(this.expression());
+      
+      if (this.peek().value === ';' || this.peek().value === ',') {
+        this.advance();
+      } else {
+        break;
+      }
+    }
+    
+    return {
+      type: 'print_statement',
+      expressions
+    };
+  }
+
+  private parseInput(): ASTNode {
+    this.consume(TokenType.KEYWORD); // INPUT
+    const variables: string[] = [];
+    
+    while (!this.isAtEnd() && this.peek().type !== TokenType.STATEMENT_SEPARATOR) {
+      if (this.peek().type === TokenType.IDENTIFIER) {
+        variables.push(this.advance().value);
+      }
+      
+      if (this.peek().value === ',') {
+        this.advance();
+      } else {
+        break;
+      }
+    }
+    
+    return {
+      type: 'input_statement',
+      variables
+    };
+  }
+
+  private parseIf(): ASTNode {
+    this.consume(TokenType.KEYWORD); // IF
+    const condition = this.expression();
+    
+    if (this.peek().type === TokenType.KEYWORD && this.peek().value === 'THEN') {
+      this.consume(TokenType.KEYWORD); // THEN
+      const statement = this.parseStatement();
+      
+      return {
+        type: 'if_statement',
+        condition,
+        thenStatement: statement
+      };
+    }
+    
+    throw new Error('IF without THEN');
+  }
+
+  private parseFor(): ASTNode {
+    this.consume(TokenType.KEYWORD); // FOR
+    const variable = this.consume(TokenType.IDENTIFIER).value;
+    this.consume(TokenType.EQUALS);
+    const start = this.expression();
+    this.consume(TokenType.KEYWORD); // TO
+    const end = this.expression();
+    
+    let step = null;
+    if (this.peek().type === TokenType.KEYWORD && this.peek().value === 'STEP') {
+      this.consume(TokenType.KEYWORD); // STEP
+      step = this.expression();
+    }
+    
+    return {
+      type: 'for_statement',
+      variable,
+      start,
+      end,
+      step
+    };
+  }
+
+  private parseDim(): ASTNode {
+    this.consume(TokenType.KEYWORD); // DIM
+    const arrays: Array<{ name: string; dimensions: ASTNode[] }> = [];
+    
+    while (!this.isAtEnd() && this.peek().type !== TokenType.STATEMENT_SEPARATOR) {
+      const name = this.consume(TokenType.IDENTIFIER).value;
+      const dimensions: ASTNode[] = [];
+      
+      if (this.peek().value === '(') {
+        this.consume(TokenType.LPAREN);
+        
+        while (this.peek().value !== ')') {
+          dimensions.push(this.expression());
+          
+          if (this.peek().value === ',') {
+            this.advance();
+          } else {
+            break;
+          }
+        }
+        
+        this.consume(TokenType.RPAREN);
+      }
+      
+      arrays.push({ name, dimensions });
+      
+      if (this.peek().value === ',') {
+        this.advance();
+      } else {
+        break;
+      }
+    }
+    
+    return {
+      type: 'dim_statement',
+      arrays
+    };
+  }
+
+  private parseGoto(): ASTNode {
+    this.consume(TokenType.KEYWORD); // GOTO
+    const lineNumber = this.consume(TokenType.LINE_NUMBER).value;
+    
+    return {
+      type: 'goto_statement',
+      lineNumber
+    };
+  }
+
+  private parseGosub(): ASTNode {
+    this.consume(TokenType.KEYWORD); // GOSUB
+    const lineNumber = this.consume(TokenType.LINE_NUMBER).value;
+    
+    return {
+      type: 'gosub_statement',
+      lineNumber
+    };
+  }
+
+  private parseRead(): ASTNode {
+    this.consume(TokenType.KEYWORD); // READ
+    const variables: string[] = [];
+    
+    while (!this.isAtEnd() && this.peek().type !== TokenType.STATEMENT_SEPARATOR) {
+      if (this.peek().type === TokenType.IDENTIFIER) {
+        variables.push(this.advance().value);
+      }
+      
+      if (this.peek().value === ',') {
+        this.advance();
+      } else {
+        break;
+      }
+    }
+    
+    return {
+      type: 'read_statement',
+      variables
+    };
+  }
+
+  private parseData(): ASTNode {
+    this.consume(TokenType.KEYWORD); // DATA
+    const values: Array<string | number> = [];
+    
+    while (!this.isAtEnd() && this.peek().type !== TokenType.STATEMENT_SEPARATOR) {
+      if (this.peek().type === TokenType.NUMBER) {
+        values.push(parseFloat(this.advance().value));
+      } else if (this.peek().type === TokenType.STRING) {
+        values.push(this.advance().value);
+      }
+      
+      if (this.peek().value === ',') {
+        this.advance();
+      } else {
+        break;
+      }
+    }
+    
+    return {
+      type: 'data_statement',
+      values
+    };
   }
 
   private expression(): ASTNode {
