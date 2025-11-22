@@ -49,23 +49,27 @@ export class ZXBasicLexer {
   private input: string;
   private position: number;
   private line: number;
+  private column: number;
 
   constructor() {
     this.input = '';
     this.position = 0;
     this.line = 0;
+    this.column = 0;
   }
 
   tokenize(code: string): Token[] {
     this.input = code;
     this.position = 0;
     this.line = 0;
+    this.column = 0;
     const tokens: Token[] = [];
 
     while (this.position < this.input.length) {
       if (this.peek() === '\n') {
         this.line++;
-        this.advance();
+        this.column = 0;
+        this.position++;
         continue;
       }
 
@@ -76,6 +80,13 @@ export class ZXBasicLexer {
 
       if (this.isCommentStart()) {
         tokens.push(this.tokenizeComment());
+        continue;
+      }
+
+      // Check for keywords
+      const keywordToken = this.tryTokenizeKeyword();
+      if (keywordToken) {
+        tokens.push(keywordToken);
         continue;
       }
 
@@ -101,13 +112,6 @@ export class ZXBasicLexer {
 
       if (this.isPunctuation(this.peek())) {
         tokens.push(this.tokenizePunctuation());
-        continue;
-      }
-
-      // Check for keywords
-      const keywordToken = this.tryTokenizeKeyword();
-      if (keywordToken) {
-        tokens.push(keywordToken);
         continue;
       }
 
@@ -345,6 +349,8 @@ export class ZXBasicLexer {
     this.advance(); // Variable name
     if (this.peek() === '$') {
       this.advance(); // String variable indicator
+    } else if (this.peek() === '%') {
+      this.advance(); // Integer variable indicator
     }
     return {
       type: TokenType.IDENTIFIER,
@@ -626,16 +632,34 @@ export class ZXBasicParser {
       const name = token.value;
       this.advance();
 
-      // Check for function call
+      // Check for function call or array access - in ZX Basic they use the same syntax
+      if (this.current().type === TokenType.PUNCTUATION && this.current().value === '(') {
+        // For simplicity, treat all (expr) after identifiers as array access
+        // In ZX Basic, the difference is semantic based on variable definition
+        return this.parseArrayAccess(name, start, line);
+      }
+
+      return {
+        type: 'identifier',
+        name,
+        start,
+        end: token.end,
+        line
+      };
+    }
+
+    if (token.type === TokenType.KEYWORD) {
+      // Keywords like SIN, COS etc. can be followed by parentheses for function calls
+      const start = token.start;
+      const line = token.line;
+      const name = token.value;
+      this.advance();
+
       if (this.current().type === TokenType.PUNCTUATION && this.current().value === '(') {
         return this.parseFunctionCall(name, start, line);
       }
 
-      // Check for array access
-      if (this.current().type === TokenType.PUNCTUATION && this.current().value === '(') {
-        return this.parseArrayAccess(name, start, line);
-      }
-
+      // Keywords not followed by ( are just identifiers
       return {
         type: 'identifier',
         name,
@@ -705,8 +729,6 @@ export class ZXBasicParser {
   }
 
   private parseParenthesizedExpression(): ASTNode | null {
-    const start = this.current().start;
-    const line = this.current().line;
     this.advance(); // Skip '('
     const expr = this.expression();
     if (!expr) return null;
@@ -714,15 +736,9 @@ export class ZXBasicParser {
     if (this.current().type !== TokenType.PUNCTUATION || this.current().value !== ')') {
       return null;
     }
-    const end = this.advance().end;
+    this.advance(); // Skip ')'
 
-    return {
-      type: 'parenthesized_expr',
-      expr,
-      start,
-      end,
-      line
-    };
+    return expr;
   }
 
   private isComparisonOperator(token: Token): boolean {

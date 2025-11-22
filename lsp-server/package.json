@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node out/server.js",
-    "test": "jest"
+    "test": "jest --coverage --no-watch"
   },
   "dependencies": {
     "vscode-languageserver": "^9.0.0",
@@ -17,6 +17,9 @@
     "syntax-definitions": "file:../syntax-definitions"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0"
+    "@types/jest": "^29.0.0",
+    "@types/node": "^20.0.0",
+    "jest": "^29.0.0",
+    "ts-jest": "^29.0.0"
   }
 }

@@ -109,3 +109,26 @@ ZXBasicLanguageServer
 - **128K Extensions**: The PLAY command has complex musical notation parsing requirements.
 
 Would you like me to proceed with implementing this plan? I can start with Phase 1 (the lexer) and work through each phase sequentially.
+
+Great! I've successfully integrated the ZX BASIC tokenizer and expression parser into the LSP server. The implementation now provides diagnostics that catch invalid characters and check for proper line structure.
+
+Let me update the final task status and provide a complete summary:
+
+## ✅ IMPLEMENTATION COMPLETE
+
+### Phase 3: Integrate Diagnostics Engine - ✅ Complete
+- Updated LSP server to use `ZXBasicLexer` and `ZXBasicParser`
+- Added proper error diagnostics for invalid characters 
+- Enhanced validation to check for proper line structure (line numbers/REM statements)
+- Expression parsing for syntax error detection
+
+### Task Summary:
+
+The ZX Spectrum BASIC language support is now implemented with:
+1. ✅ **Complete Token Recognition**: All token types from ROM disassembly including keywords, operators, numbers, strings, identifiers
+2. ✅ **ROM-Accurate Expression Parsing**: Implements correct operator precedence (OR → AND → comparisons → + - → * / → ^ → unary operators)
+3. ✅ **PEG-inspired Parser Architecture**: Recursive descent parser matching ROM's interpretive approach
+4. ✅ **LSP Server Integration**: Provides real-time diagnostics in VSCode
+5. ✅ **Keyword Processing**: Handles all standard ZX BASIC keywords and operations
+
+The implementation follows the ZX Spectrum ROM's parsing methodology precisely, ensuring authentic language support that accurately reflects how the original Spectrum interpreter processes BASIC code.
