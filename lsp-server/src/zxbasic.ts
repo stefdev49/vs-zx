@@ -1,759 +1,737 @@
+// ZX BASIC Language Support for LSP Server
+// Based on ZX BASIC ROM disassembly and syntax
+
 export enum TokenType {
-  // Keywords and Commands
+  // Generic categories
   KEYWORD = 'KEYWORD',
-  // Line numbers
-  LINE_NUMBER = 'LINE_NUMBER',
-  // Identifiers (variables A-Z, A$)
-  IDENTIFIER = 'IDENTIFIER',
-  // String literals
-  STRING = 'STRING',
-  // Numeric literals
-  NUMBER = 'NUMBER',
-  // Operators
   OPERATOR = 'OPERATOR',
-  // Punctuation (: , ; ( ) etc.)
   PUNCTUATION = 'PUNCTUATION',
-  // REM statements
   COMMENT = 'COMMENT',
-  // End of line/input
+
+  // Keywords
+  LET = 'LET',
+  IF = 'IF',
+  THEN = 'THEN',
+  FOR = 'FOR',
+  TO = 'TO',
+  STEP = 'STEP',
+  NEXT = 'NEXT',
+  READ = 'READ',
+  DATA = 'DATA',
+  RESTORE = 'RESTORE',
+  DIM = 'DIM',
+  DEF = 'DEF FN',
+  FN = 'FN',
+  GOTO = 'GO TO',
+  GOSUB = 'GO SUB',
+  RETURN = 'RETURN',
+  STOP = 'STOP',
+  RANDOMIZE = 'RANDOMIZE',
+  CLEAR = 'CLEAR',
+  CLS = 'CLS',
+  INPUT = 'INPUT',
+  LOAD = 'LOAD',
+  SAVE = 'SAVE',
+  VERIFY = 'VERIFY',
+  MERGE = 'MERGE',
+  BEEP = 'BEEP',
+  INK = 'INK',
+  PAPER = 'PAPER',
+  FLASH = 'FLASH',
+  BRIGHT = 'BRIGHT',
+  INVERSE = 'INVERSE',
+  OVER = 'OVER',
+  BORDER = 'BORDER',
+  PLOT = 'PLOT',
+  DRAW = 'DRAW',
+  CIRCLE = 'CIRCLE',
+  LPRINT = 'LPRINT',
+  LLIST = 'LLIST',
+  COPY = 'COPY',
+  SPECTRUM = 'SPECTRUM',
+  PLAY = 'PLAY',
+  ERASE = 'ERASE',
+  CAT = 'CAT',
+  FORMAT = 'FORMAT',
+  MOVE = 'MOVE',
+
+  // Operators and symbols
+  PLUS = '+',
+  MINUS = '-',
+  MULTIPLY = '*',
+  DIVIDE = '/',
+  POWER = '^',
+  EQUALS = '=',
+  NOT_EQUALS = '<>',
+  LESS_THAN = '<',
+  GREATER_THAN = '>',
+  LESS_EQUAL = '<=',
+  GREATER_EQUAL = '>=',
+  AND = 'AND',
+  OR = 'OR',
+  NOT = 'NOT',
+
+  // Literals
+  NUMBER = 'NUMBER',
+  STRING = 'STRING',
+  IDENTIFIER = 'IDENTIFIER',
+  LINE_NUMBER = 'LINE_NUMBER',
+
+  // Punctuation
+  LPAREN = '(',
+  RPAREN = ')',
+  COLON = ':',
+  SEMICOLON = ';',
+  COMMA = ',',
+  STATEMENT_SEPARATOR = 'STATEMENT_SEPARATOR',
+
+  // Special
   EOF = 'EOF',
-  // Invalid tokens
   INVALID = 'INVALID'
 }
 
 export interface Token {
   type: TokenType;
   value: string;
+  line: number;
   start: number;
   end: number;
-  line: number;
-}
-
-export interface ASTNode {
-  type: 'binary_expr' | 'unary_expr' | 'identifier' | 'number' | 'string' | 'function_call' | 'array_access' | 'parenthesized_expr';
-  operator?: string;
-  left?: ASTNode;
-  right?: ASTNode;
-  operand?: ASTNode;
-  value?: string | number;
-  name?: string;
-  args?: ASTNode[];
-  index?: ASTNode;
-  expr?: ASTNode;
-  start: number;
-  end: number;
-  line: number;
 }
 
 export class ZXBasicLexer {
-  private input: string;
-  private position: number;
-  private line: number;
-  private column: number;
+  private text: string;
+  private position: number = 0;
+  private line: number = 0;
+  private column: number = 0;
 
   constructor() {
-    this.input = '';
-    this.position = 0;
-    this.line = 0;
-    this.column = 0;
+    this.text = '';
   }
 
-  tokenize(code: string): Token[] {
-    this.input = code;
+  tokenize(text: string): Token[] {
+    this.text = text;
     this.position = 0;
     this.line = 0;
     this.column = 0;
     const tokens: Token[] = [];
+    let atLineStart = true; // Track if we're at the start of a line
 
-    while (this.position < this.input.length) {
-      if (this.peek() === '\n') {
+    while (this.position < this.text.length) {
+      const char = this.currentChar();
+      if (char === '\n') {
         this.line++;
         this.column = 0;
-        this.position++;
-        continue;
-      }
-
-      if (this.isWhitespace(this.peek())) {
         this.advance();
-        continue;
+        atLineStart = true; // Next non-whitespace could be a line number
+      } else if (char === '\t' || char === ' ') {
+        this.advance();
+      } else if (atLineStart && this.isDigit(char)) {
+        // Line number at start of line
+        tokens.push(this.lexLineNumber());
+        atLineStart = false;
+      } else if (this.isDigit(char) || (char === '.' && this.position + 1 < this.text.length && this.isDigit(this.text[this.position + 1]))) {
+        tokens.push(this.lexNumber());
+        atLineStart = false;
+      } else if (this.isLetter(char)) {
+        tokens.push(this.lexIdentifier());
+        atLineStart = false;
+      } else if (char === '"') {
+        tokens.push(this.lexString());
+        atLineStart = false;
+      } else if (char === ':') {
+        // Colon is a statement separator in ZX BASIC
+        const startCol = this.column;
+        const token: Token = {
+          type: TokenType.STATEMENT_SEPARATOR,
+          value: ':',
+          line: this.line,
+          start: startCol,
+          end: startCol + 1
+        };
+        tokens.push(token);
+        this.advance();
+        atLineStart = false;
+      } else if (this.isPunctuation(char)) {
+        const startCol = this.column;
+        const token: Token = {
+          type: TokenType.PUNCTUATION,
+          value: char,
+          line: this.line,
+          start: startCol,
+          end: startCol + 1
+        };
+        tokens.push(token);
+        this.advance();
+        atLineStart = false;
+      } else if (this.isOperator(char)) {
+        tokens.push(this.lexOperator());
+        atLineStart = false;
+      } else {
+        const startCol = this.column;
+        tokens.push({
+          type: TokenType.INVALID,
+          value: char,
+          line: this.line,
+          start: startCol,
+          end: startCol + 1
+        });
+        this.advance();
       }
-
-      if (this.isCommentStart()) {
-        tokens.push(this.tokenizeComment());
-        continue;
-      }
-
-      // Check for keywords
-      const keywordToken = this.tryTokenizeKeyword();
-      if (keywordToken) {
-        tokens.push(keywordToken);
-        continue;
-      }
-
-      if (this.isStringStart()) {
-        tokens.push(this.tokenizeString());
-        continue;
-      }
-
-      if (this.isNumberStart()) {
-        tokens.push(this.tokenizeNumber());
-        continue;
-      }
-
-      if (this.isIdentifierStart()) {
-        tokens.push(this.tokenizeIdentifier());
-        continue;
-      }
-
-      if (this.isOperatorStart()) {
-        tokens.push(this.tokenizeOperator());
-        continue;
-      }
-
-      if (this.isPunctuation(this.peek())) {
-        tokens.push(this.tokenizePunctuation());
-        continue;
-      }
-
-      // Invalid character
-      const start = this.position;
-      this.advance();
-      tokens.push({
-        type: TokenType.INVALID,
-        value: this.input[start],
-        start,
-        end: this.position,
-        line: this.line
-      });
     }
 
     tokens.push({
       type: TokenType.EOF,
       value: '',
-      start: this.position,
-      end: this.position,
-      line: this.line
+      line: this.line,
+      start: this.column,
+      end: this.column
     });
-
     return tokens;
   }
 
-  private peek(): string {
-    return this.position < this.input.length ? this.input[this.position] : '';
+  private currentChar(): string {
+    return this.text[this.position];
   }
 
   private peekNext(): string {
-    return this.position + 1 < this.input.length ? this.input[this.position + 1] : '';
+    return this.position + 1 < this.text.length ? this.text[this.position + 1] : '';
   }
 
   private advance(): void {
     this.position++;
+    this.column++;
   }
 
-  private isWhitespace(char: string): boolean {
-    return char === ' ' || char === '\t';
+  private isDigit(char: string): boolean {
+    return /\d/.test(char);
   }
 
-  private isCommentStart(): boolean {
-    const word = this.input.substr(this.position, 3);
-    return word.toUpperCase() === 'REM';
+  private isLetter(char: string): boolean {
+    return /[a-zA-Z_]/.test(char);
   }
 
-  private isStringStart(): boolean {
-    return this.peek() === '"';
-  }
-
-  private isNumberStart(): boolean {
-    const char = this.peek();
-    return char >= '0' && char <= '9';
-  }
-
-  private isIdentifierStart(): boolean {
-    const char = this.peek().toUpperCase();
-    return char >= 'A' && char <= 'Z';
-  }
-
-  private isOperatorStart(): boolean {
-    const char = this.peek();
-    return ['+', '-', '*', '/', '^', '=', '<', '>', 'AND', 'OR', 'NOT'].some(op => {
-      return op.length === 1 ? char === op : this.input.substr(this.position, op.length).toUpperCase() === op;
-    });
+  private isOperator(char: string): boolean {
+    return ['+', '-', '*', '/', '^', '=', '<', '>'].includes(char);
   }
 
   private isPunctuation(char: string): boolean {
-    return ['(', ')', ':', ',', ';'].includes(char);
+    return ['(', ')', ';', ','].includes(char);
   }
 
-  private tryTokenizeKeyword(): Token | null {
-    const keywordMap: { [key: string]: TokenType } = {
-      'LET': TokenType.KEYWORD,
-      'PRINT': TokenType.KEYWORD,
-      'IF': TokenType.KEYWORD,
-      'THEN': TokenType.KEYWORD,
-      'ELSE': TokenType.KEYWORD,
-      'FOR': TokenType.KEYWORD,
-      'TO': TokenType.KEYWORD,
-      'NEXT': TokenType.KEYWORD,
-      'GOTO': TokenType.KEYWORD,
-      'GOSUB': TokenType.KEYWORD,
-      'RETURN': TokenType.KEYWORD,
-      'READ': TokenType.KEYWORD,
-      'DATA': TokenType.KEYWORD,
-      'RESTORE': TokenType.KEYWORD,
-      'DIM': TokenType.KEYWORD,
-      'REM': TokenType.KEYWORD,
-      'NEW': TokenType.KEYWORD,
-      'RUN': TokenType.KEYWORD,
-      'STOP': TokenType.KEYWORD,
-      'CONTINUE': TokenType.KEYWORD,
-      'LIST': TokenType.KEYWORD,
-      'LLIST': TokenType.KEYWORD,
-      'CLEAR': TokenType.KEYWORD,
-      'CLS': TokenType.KEYWORD,
-      'INPUT': TokenType.KEYWORD,
-      'SAVE': TokenType.KEYWORD,
-      'LOAD': TokenType.KEYWORD,
-      'VERIFY': TokenType.KEYWORD,
-      'MERGE': TokenType.KEYWORD,
-      'BORDER': TokenType.KEYWORD,
-      'INK': TokenType.KEYWORD,
-      'PAPER': TokenType.KEYWORD,
-      'FLASH': TokenType.KEYWORD,
-      'BRIGHT': TokenType.KEYWORD,
-      'INVERSE': TokenType.KEYWORD,
-      'OVER': TokenType.KEYWORD,
-      'OUT': TokenType.KEYWORD,
-      'PLOT': TokenType.KEYWORD,
-      'DRAW': TokenType.KEYWORD,
-      'RANDOMIZE': TokenType.KEYWORD,
-      'PAUSE': TokenType.KEYWORD,
-      'POKE': TokenType.KEYWORD,
-      'COPY': TokenType.KEYWORD,
-      'SPECTRUM': TokenType.KEYWORD,
-      'PLAY': TokenType.KEYWORD,
-      'ERASE': TokenType.KEYWORD,
-      'CAT': TokenType.KEYWORD,
-      'FORMAT': TokenType.KEYWORD,
-      'MOVE': TokenType.KEYWORD,
-      'OPEN': TokenType.KEYWORD,
-      'CLOSE': TokenType.KEYWORD,
-      'VAL': TokenType.KEYWORD,
-      'LEN': TokenType.KEYWORD,
-      'STR$': TokenType.KEYWORD,
-      'CHR$': TokenType.KEYWORD,
-      'CODE': TokenType.KEYWORD,
-      'SCREEN$': TokenType.KEYWORD,
-      'ATTR': TokenType.KEYWORD,
-      'POINT': TokenType.KEYWORD,
-      'TAB': TokenType.KEYWORD,
-      'AT': TokenType.KEYWORD,
-      'NEWLINE': TokenType.KEYWORD,
-      'PI': TokenType.KEYWORD,
-      'SIN': TokenType.KEYWORD,
-      'COS': TokenType.KEYWORD,
-      'TAN': TokenType.KEYWORD,
-      'ASN': TokenType.KEYWORD,
-      'ACS': TokenType.KEYWORD,
-      'ATN': TokenType.KEYWORD,
-      'LN': TokenType.KEYWORD,
-      'EXP': TokenType.KEYWORD,
-      'INT': TokenType.KEYWORD,
-      'SQR': TokenType.KEYWORD,
-      'SGN': TokenType.KEYWORD,
-      'ABS': TokenType.KEYWORD,
-      'PEEK': TokenType.KEYWORD,
-      'IN': TokenType.KEYWORD,
-      'USR': TokenType.KEYWORD,
-      'RND': TokenType.KEYWORD,
-
-      'STEP': TokenType.KEYWORD
+  private createToken(type: TokenType, value: string, startOffset: number = 0): Token {
+    return {
+      type,
+      value,
+      line: this.line,
+      start: this.column - startOffset,
+      end: this.column
     };
+  }
 
-    for (const keyword of Object.keys(keywordMap)) {
-      if (this.input.substr(this.position, keyword.length).toUpperCase() === keyword) {
-        const start = this.position;
-        this.position += keyword.length;
-        return {
-          type: keywordMap[keyword],
-          value: keyword,
-          start,
-          end: this.position,
-          line: this.line
-        };
+  private lexNumber(): Token {
+    const start = this.position;
+    const startCol = this.column;
+    let hasDot = false;
+    let hasExponent = false;
+
+    // Read the main number part
+    while (this.position < this.text.length) {
+      const char = this.currentChar();
+      if (this.isDigit(char)) {
+        this.advance();
+      } else if (char === '.' && !hasDot && !hasExponent) {
+        hasDot = true;
+        this.advance();
+      } else {
+        break;
       }
     }
-    return null;
-  }
 
-  private tokenizeComment(): Token {
-    const start = this.position;
-    this.position += 3; // Skip "REM"
-    while (this.position < this.input.length && this.peek() !== '\n') {
-      this.advance();
-    }
-    return {
-      type: TokenType.COMMENT,
-      value: this.input.substring(start, this.position),
-      start,
-      end: this.position,
-      line: this.line
-    };
-  }
-
-  private tokenizeString(): Token {
-    const start = this.position;
-    this.advance(); // Skip opening quote
-    while (this.position < this.input.length && this.peek() !== '"') {
-      this.advance();
-    }
-    if (this.peek() === '"') {
-      this.advance(); // Skip closing quote
-    }
-    return {
-      type: TokenType.STRING,
-      value: this.input.substring(start, this.position),
-      start,
-      end: this.position,
-      line: this.line
-    };
-  }
-
-  private tokenizeNumber(): Token {
-    const start = this.position;
-    while (this.position < this.input.length &&
-           ((this.peek() >= '0' && this.peek() <= '9') || this.peek() === '.')) {
-      this.advance();
-    }
-    if (this.peek().toUpperCase() === 'E') {
-      this.advance();
-      if (this.peek() === '+' || this.peek() === '-') {
+    // Check for exponent (E or e followed by optional +/- and digits)
+    if (this.position < this.text.length && (this.currentChar() === 'E' || this.currentChar() === 'e')) {
+      const savedPos = this.position;
+      const savedCol = this.column;
+      this.advance(); // consume E/e
+      
+      // Allow optional + or -
+      if (this.currentChar() === '+' || this.currentChar() === '-') {
         this.advance();
       }
-      while (this.peek() >= '0' && this.peek() <= '9') {
-        this.advance();
+
+      // Must have at least one digit after E
+      if (this.position < this.text.length && this.isDigit(this.currentChar())) {
+        hasExponent = true;
+        while (this.position < this.text.length && this.isDigit(this.currentChar())) {
+          this.advance();
+        }
+      } else {
+        // Not a valid exponent, restore position
+        this.position = savedPos;
+        this.column = savedCol;
       }
     }
+
+    const value = this.text.substring(start, this.position);
     return {
       type: TokenType.NUMBER,
-      value: this.input.substring(start, this.position),
-      start,
-      end: this.position,
-      line: this.line
+      value,
+      line: this.line,
+      start: startCol,
+      end: this.column
     };
   }
 
-  private tokenizeIdentifier(): Token {
+  private lexLineNumber(): Token {
     const start = this.position;
-    this.advance(); // Variable name
-    if (this.peek() === '$') {
-      this.advance(); // String variable indicator
-    } else if (this.peek() === '%') {
-      this.advance(); // Integer variable indicator
+    const startCol = this.column;
+
+    // Read digits only (line numbers are integers 1-9999)
+    while (this.position < this.text.length && this.isDigit(this.currentChar())) {
+      this.advance();
     }
+
+    const value = this.text.substring(start, this.position);
     return {
-      type: TokenType.IDENTIFIER,
-      value: this.input.substring(start, this.position),
-      start,
-      end: this.position,
-      line: this.line
+      type: TokenType.LINE_NUMBER,
+      value,
+      line: this.line,
+      start: startCol,
+      end: this.column
     };
   }
 
-  private tokenizeOperator(): Token {
+  private lexIdentifier(): Token {
     const start = this.position;
-    const char = this.peek();
+    const startCol = this.column;
 
-    // Check compound operators first (longest first)
-    if (this.input.substr(this.position, 3).toUpperCase() === 'AND') {
-      this.position += 3;
-      return { type: TokenType.OPERATOR, value: 'AND', start, end: this.position, line: this.line };
-    }
-    if (this.input.substr(this.position, 3).toUpperCase() === 'NOT') {
-      this.position += 3;
-      return { type: TokenType.OPERATOR, value: 'NOT', start, end: this.position, line: this.line };
-    }
-    if (this.input.substr(this.position, 2).toUpperCase() === 'OR') {
-      this.position += 2;
-      return { type: TokenType.OPERATOR, value: 'OR', start, end: this.position, line: this.line };
+    // Include letters, digits, and ZX BASIC suffixes ($ for strings, % for integers)
+    while (this.position < this.text.length &&
+           (this.isLetter(this.currentChar()) ||
+            this.isDigit(this.currentChar()))) {
+      this.advance();
     }
 
-    // Check compound comparison operators
-    if (this.input.substr(this.position, 2) === '<>') {
-      this.position += 2;
-      return { type: TokenType.OPERATOR, value: '<>', start, end: this.position, line: this.line };
-    }
-    if (this.input.substr(this.position, 2) === '<=') {
-      this.position += 2;
-      return { type: TokenType.OPERATOR, value: '<=', start, end: this.position, line: this.line };
-    }
-    if (this.input.substr(this.position, 2) === '>=') {
-      this.position += 2;
-      return { type: TokenType.OPERATOR, value: '>=', start, end: this.position, line: this.line };
+    // Check for string ($) or integer (%) suffix
+    if (this.position < this.text.length && 
+        (this.currentChar() === '$' || this.currentChar() === '%')) {
+      this.advance();
     }
 
-    // Single character operators
-    if (['+', '-', '*', '/', '^', '=', '<', '>'].includes(char)) {
+    let value = this.text.substring(start, this.position).toUpperCase();
+    
+    // Special handling for REM comments - consume rest of line
+    if (value === 'REM') {
+      while (this.position < this.text.length && this.currentChar() !== '\n') {
+        this.advance();
+      }
+      const commentValue = this.text.substring(start, this.position);
+      return {
+        type: TokenType.COMMENT,
+        value: commentValue,
+        line: this.line,
+        start: startCol,
+        end: this.column
+      };
+    }
+    
+    // Special handling for two-word keywords: "GO TO", "GO SUB", "DEF FN"
+    if (value === 'GO' || value === 'DEF') {
+      const savedPos = this.position;
+      const savedCol = this.column;
+      
+      // Skip whitespace
+      while (this.position < this.text.length && 
+             (this.currentChar() === ' ' || this.currentChar() === '\t')) {
+        this.advance();
+      }
+      
+      // Check if next word forms a two-word keyword
+      const nextWordStart = this.position;
+      if (this.position < this.text.length && this.isLetter(this.currentChar())) {
+        while (this.position < this.text.length &&
+               (this.isLetter(this.currentChar()) || this.isDigit(this.currentChar()))) {
+          this.advance();
+        }
+        const nextWord = this.text.substring(nextWordStart, this.position).toUpperCase();
+        
+        if (value === 'GO' && nextWord === 'TO') {
+          value = 'GOTO';  // Normalize to single word
+        } else if (value === 'GO' && nextWord === 'SUB') {
+          value = 'GOSUB';  // Normalize to single word
+        } else if (value === 'DEF' && nextWord === 'FN') {
+          value = 'DEFFN';  // Normalize to single word
+        } else {
+          // Not a two-word keyword, restore position
+          this.position = savedPos;
+          this.column = savedCol;
+        }
+      } else {
+        // No next word, restore position
+        this.position = savedPos;
+        this.column = savedCol;
+      }
+    }
+    
+    const tokenType = this.getKeywordType(value);
+
+    return {
+      type: tokenType,
+      value,
+      line: this.line,
+      start: startCol,
+      end: this.column
+    };
+  }
+
+  private lexString(): Token {
+    const start = this.position;
+    const startCol = this.column;
+    this.advance(); // Skip opening quote
+
+    while (this.position < this.text.length && this.currentChar() !== '"') {
+      this.advance();
+    }
+
+    if (this.currentChar() === '"') {
+      this.advance(); // Include closing quote
+    }
+
+    const value = this.text.substring(start, this.position);
+    return {
+      type: TokenType.STRING,
+      value,
+      line: this.line,
+      start: startCol,
+      end: this.column
+    };
+  }
+
+  private lexOperator(): Token {
+    const startCol = this.column;
+    const char = this.currentChar();
+    this.advance();
+
+    if (char === '<' && this.currentChar() === '>') {
       this.advance();
       return {
         type: TokenType.OPERATOR,
+        value: '<>',
+        line: this.line,
+        start: startCol,
+        end: this.column
+      };
+    } else if (char === '<' && this.currentChar() === '=') {
+      this.advance();
+      return {
+        type: TokenType.OPERATOR,
+        value: '<=',
+        line: this.line,
+        start: startCol,
+        end: this.column
+      };
+    } else if (char === '>' && this.currentChar() === '=') {
+      this.advance();
+      return {
+        type: TokenType.OPERATOR,
+        value: '>=',
+        line: this.line,
+        start: startCol,
+        end: this.column
+      };
+    } else {
+      return {
+        type: TokenType.OPERATOR,
         value: char,
-        start,
-        end: this.position,
-        line: this.line
+        line: this.line,
+        start: startCol,
+        end: this.column
       };
     }
-
-    // Not an operator, error
-    this.advance();
-    return {
-      type: TokenType.INVALID,
-      value: char,
-      start,
-      end: this.position,
-      line: this.line
-    };
   }
 
-  private tokenizePunctuation(): Token {
-    const start = this.position;
-    const value = this.peek();
-    this.advance();
-    return {
-      type: TokenType.PUNCTUATION,
-      value,
-      start,
-      end: this.position,
-      line: this.line
-    };
+  private getKeywordType(value: string): TokenType {
+    // ZX BASIC keywords (based on ROM disassembly)
+    const keywords = [
+      'PRINT', 'LET', 'IF', 'THEN', 'ELSE', 'FOR', 'TO', 'STEP', 'NEXT',
+      'WHILE', 'WEND', 'REPEAT', 'UNTIL', 'READ', 'DATA', 'RESTORE', 'DIM',
+      'DEF', 'FN', 'DEFFN', 'GOTO', 'GOSUB', 'RETURN', 'STOP', 'RANDOMIZE', 'CONTINUE',
+      'CLEAR', 'CLS', 'INPUT', 'LOAD', 'SAVE', 'VERIFY', 'MERGE', 'BEEP',
+      'INK', 'PAPER', 'FLASH', 'BRIGHT', 'INVERSE', 'OVER', 'BORDER', 'PLOT',
+      'DRAW', 'CIRCLE', 'LPRINT', 'LLIST', 'COPY', 'SPECTRUM', 'PLAY', 'ERASE',
+      'CAT', 'FORMAT', 'MOVE', 'VAL', 'LEN', 'STR$', 'CHR$', 'CODE', 'SIN',
+      'COS', 'TAN', 'ASN', 'ACS', 'ATN', 'LN', 'EXP', 'INT', 'SQR', 'SGN',
+      'ABS', 'PEEK', 'USR', 'INKEY$', 'PI', 'TRUE', 'FALSE', 'RND', 'ATTR',
+      'SCREEN$', 'POINT', 'TAB', 'AND', 'OR', 'NOT', 'VAL$', 'CHR$', 'SCREEN$',
+      'ATTR', 'POINT', 'TAB', 'AT', 'STEP', 'OVER', 'INVERSE', 'BRIGHT', 'FLASH',
+      'INK', 'PAPER', 'CIRCLE', 'DRAW', 'LPRINT', 'LLIST'
+    ];
+
+    if (keywords.includes(value)) {
+      return TokenType.KEYWORD;
+    }
+    return TokenType.IDENTIFIER;
   }
+}
+
+// Simple AST node for expressions
+export interface ASTNode {
+  type: 'binary_expr' | 'unary_expr' | 'literal' | 'number' | 'string' | 'identifier' | 'function';
+  operator?: string;
+  left?: ASTNode;
+  right?: ASTNode;
+  operand?: ASTNode;
+  value?: any;
+  name?: string;
+  args?: ASTNode[];
 }
 
 export class ZXBasicParser {
   private tokens: Token[];
-  private currentIndex: number;
+  private current: number = 0;
 
   constructor(tokens: Token[]) {
     this.tokens = tokens;
-    this.currentIndex = 0;
   }
 
   parseExpression(): ASTNode | null {
     try {
       return this.expression();
-    } catch {
+    } catch (e) {
       return null;
     }
   }
 
-  private current(): Token {
-    return this.currentIndex < this.tokens.length ? this.tokens[this.currentIndex] : this.tokens[this.tokens.length - 1];
+  private expression(): ASTNode {
+    return this.logicalOr();
   }
 
-  private advance(): Token {
-    if (this.currentIndex < this.tokens.length) {
-      return this.tokens[this.currentIndex++];
-    }
-    return this.tokens[this.tokens.length - 1];
-  }
+  private logicalOr(): ASTNode {
+    let expr = this.logicalAnd();
 
-  private peek(offset: number = 1): Token {
-    const index = this.currentIndex + offset;
-    return index < this.tokens.length ? this.tokens[index] : this.tokens[this.tokens.length - 1];
-  }
-
-  private expression(): ASTNode | null {
-    return this.logicalOrExpression();
-  }
-
-  private logicalOrExpression(): ASTNode | null {
-    let node = this.logicalAndExpression();
-    while (this.current().type === TokenType.OPERATOR && this.current().value === 'OR') {
-      const operator = this.advance().value;
-      const right = this.logicalAndExpression();
-      if (!right) return null;
-      node = {
-        type: 'binary_expr',
-        operator,
-        left: node!,
-        right,
-        start: node!.start,
-        end: right.end,
-        line: node!.line
-      };
-    }
-    return node;
-  }
-
-  private logicalAndExpression(): ASTNode | null {
-    let node = this.comparisonExpression();
-    while (this.current().type === TokenType.OPERATOR && this.current().value === 'AND') {
-      const operator = this.advance().value;
-      const right = this.comparisonExpression();
-      if (!right) return null;
-      node = {
-        type: 'binary_expr',
-        operator,
-        left: node!,
-        right,
-        start: node!.start,
-        end: right.end,
-        line: node!.line
-      };
-    }
-    return node;
-  }
-
-  private comparisonExpression(): ASTNode | null {
-    let node = this.additiveExpression();
-    while (this.isComparisonOperator(this.current())) {
-      const operator = this.advance().value;
-      const right = this.additiveExpression();
-      if (!right) return null;
-      node = {
-        type: 'binary_expr',
-        operator,
-        left: node!,
-        right,
-        start: node!.start,
-        end: right.end,
-        line: node!.line
-      };
-    }
-    return node;
-  }
-
-  private additiveExpression(): ASTNode | null {
-    let node = this.multiplicativeExpression();
-    while (this.current().type === TokenType.OPERATOR && (this.current().value === '+' || this.current().value === '-')) {
-      const operator = this.advance().value;
-      const right = this.multiplicativeExpression();
-      if (!right) return null;
-      node = {
-        type: 'binary_expr',
-        operator,
-        left: node!,
-        right,
-        start: node!.start,
-        end: right.end,
-        line: node!.line
-      };
-    }
-    return node;
-  }
-
-  private multiplicativeExpression(): ASTNode | null {
-    let node = this.powerExpression();
-    while (this.current().type === TokenType.OPERATOR && (this.current().value === '*' || this.current().value === '/')) {
-      const operator = this.advance().value;
-      const right = this.powerExpression();
-      if (!right) return null;
-      node = {
-        type: 'binary_expr',
-        operator,
-        left: node!,
-        right,
-        start: node!.start,
-        end: right.end,
-        line: node!.line
-      };
-    }
-    return node;
-  }
-
-  private powerExpression(): ASTNode | null {
-    let node = this.unaryExpression();
-    if (this.current().type === TokenType.OPERATOR && this.current().value === '^') {
-      const operator = this.advance().value;
-      const right = this.powerExpression();
-      if (!right) return null;
-      node = {
-        type: 'binary_expr',
-        operator,
-        left: node!,
-        right,
-        start: node!.start,
-        end: right.end,
-        line: node!.line
-      };
-    }
-    return node;
-  }
-
-  private unaryExpression(): ASTNode | null {
-    if (this.current().type === TokenType.OPERATOR && this.current().value === '-') {
-      const start = this.current().start;
-      const line = this.current().line;
+    while (this.peek().type === TokenType.KEYWORD && this.peek().value === 'OR') {
       this.advance();
-      const operand = this.primaryExpression();
-      if (!operand) return null;
-      return {
-        type: 'unary_expr',
-        operator: '-',
-        operand,
-        start,
-        end: operand.end,
-        line
-      };
-    } else if (this.current().type === TokenType.KEYWORD && this.current().value === 'NOT') {
-      const start = this.current().start;
-      const line = this.current().line;
-      this.advance();
-      const operand = this.primaryExpression();
-      if (!operand) return null;
-      return {
-        type: 'unary_expr',
-        operator: 'NOT',
-        operand,
-        start,
-        end: operand.end,
-        line
+      const right = this.logicalAnd();
+      expr = {
+        type: 'binary_expr',
+        operator: 'OR',
+        left: expr,
+        right
       };
     }
-    return this.primaryExpression();
-  }
-
-  private primaryExpression(): ASTNode | null {
-    const token = this.current();
-
-    if (token.type === TokenType.NUMBER) {
-      this.advance();
-      return {
-        type: 'number',
-        value: parseFloat(token.value),
-        start: token.start,
-        end: token.end,
-        line: token.line
-      };
-    }
-
-    if (token.type === TokenType.STRING) {
-      this.advance();
-      return {
-        type: 'string',
-        value: token.value.slice(1, -1), // Remove quotes
-        start: token.start,
-        end: token.end,
-        line: token.line
-      };
-    }
-
-    if (token.type === TokenType.IDENTIFIER) {
-      const start = token.start;
-      const line = token.line;
-      const name = token.value;
-      this.advance();
-
-      // Check for function call or array access - in ZX Basic they use the same syntax
-      if (this.current().type === TokenType.PUNCTUATION && this.current().value === '(') {
-        // For simplicity, treat all (expr) after identifiers as array access
-        // In ZX Basic, the difference is semantic based on variable definition
-        return this.parseArrayAccess(name, start, line);
-      }
-
-      return {
-        type: 'identifier',
-        name,
-        start,
-        end: token.end,
-        line
-      };
-    }
-
-    if (token.type === TokenType.KEYWORD) {
-      // Keywords like SIN, COS etc. can be followed by parentheses for function calls
-      const start = token.start;
-      const line = token.line;
-      const name = token.value;
-      this.advance();
-
-      if (this.current().type === TokenType.PUNCTUATION && this.current().value === '(') {
-        return this.parseFunctionCall(name, start, line);
-      }
-
-      // Keywords not followed by ( are just identifiers
-      return {
-        type: 'identifier',
-        name,
-        start,
-        end: token.end,
-        line
-      };
-    }
-
-    if (token.type === TokenType.PUNCTUATION && token.value === '(') {
-      return this.parseParenthesizedExpression();
-    }
-
-    return null;
-  }
-
-  private parseFunctionCall(name: string, start: number, line: number): ASTNode | null {
-    this.advance(); // Skip '('
-    const args: ASTNode[] = [];
-
-    if (this.current().type !== TokenType.PUNCTUATION || this.current().value !== ')') {
-      while (true) {
-        const arg = this.expression();
-        if (!arg) return null;
-        args.push(arg);
-
-        if (this.current().type !== TokenType.PUNCTUATION || this.current().value !== ',') {
-          break;
-        }
-        this.advance(); // Skip ','
-      }
-    }
-
-    if (this.current().type !== TokenType.PUNCTUATION || this.current().value !== ')') {
-      return null;
-    }
-    const end = this.advance().end;
-
-    return {
-      type: 'function_call',
-      name,
-      args,
-      start,
-      end,
-      line
-    };
-  }
-
-  private parseArrayAccess(name: string, start: number, line: number): ASTNode | null {
-    this.advance(); // Skip '('
-    const index = this.expression();
-    if (!index) return null;
-
-    if (this.current().type !== TokenType.PUNCTUATION || this.current().value !== ')') {
-      return null;
-    }
-    const end = this.advance().end;
-
-    return {
-      type: 'array_access',
-      name,
-      index,
-      start,
-      end,
-      line
-    };
-  }
-
-  private parseParenthesizedExpression(): ASTNode | null {
-    this.advance(); // Skip '('
-    const expr = this.expression();
-    if (!expr) return null;
-
-    if (this.current().type !== TokenType.PUNCTUATION || this.current().value !== ')') {
-      return null;
-    }
-    this.advance(); // Skip ')'
 
     return expr;
   }
 
-  private isComparisonOperator(token: Token): boolean {
-    return token.type === TokenType.OPERATOR &&
-           ['=', '<>', '<', '<=', '>', '>='].includes(token.value);
+  private logicalAnd(): ASTNode {
+    let expr = this.equality();
+
+    while (this.peek().type === TokenType.KEYWORD && this.peek().value === 'AND') {
+      this.advance();
+      const right = this.equality();
+      expr = {
+        type: 'binary_expr',
+        operator: 'AND',
+        left: expr,
+        right
+      };
+    }
+
+    return expr;
+  }
+
+  private equality(): ASTNode {
+    let expr = this.comparison();
+
+    while (this.peek().type === TokenType.OPERATOR && (this.peek().value === '=' || this.peek().value === '<>')) {
+      this.advance();
+      const operator = this.previous().value;
+      const right = this.comparison();
+      expr = {
+        type: 'binary_expr',
+        operator,
+        left: expr,
+        right
+      };
+    }
+
+    return expr;
+  }
+
+  private comparison(): ASTNode {
+    let expr = this.term();
+
+    while (this.peek().type === TokenType.OPERATOR && (this.peek().value === '<' || this.peek().value === '>' || this.peek().value === '<=' || this.peek().value === '>=')) {
+      this.advance();
+      const operator = this.previous().value;
+      const right = this.term();
+      expr = {
+        type: 'binary_expr',
+        operator,
+        left: expr,
+        right
+      };
+    }
+
+    return expr;
+  }
+
+  private term(): ASTNode {
+    let expr = this.factor();
+
+    while (this.peek().type === TokenType.OPERATOR && (this.peek().value === '+' || this.peek().value === '-')) {
+      this.advance();
+      const operator = this.previous().value;
+      const right = this.factor();
+      expr = {
+        type: 'binary_expr',
+        operator,
+        left: expr,
+        right
+      };
+    }
+
+    return expr;
+  }
+
+  private factor(): ASTNode {
+    let expr = this.unary();
+
+    while (this.peek().type === TokenType.OPERATOR && (this.peek().value === '*' || this.peek().value === '/' || this.peek().value === '^')) {
+      this.advance();
+      const operator = this.previous().value;
+      const right = this.unary();
+      expr = {
+        type: 'binary_expr',
+        operator,
+        left: expr,
+        right
+      };
+    }
+
+    return expr;
+  }
+
+  private unary(): ASTNode {
+    if (this.peek().type === TokenType.OPERATOR && this.peek().value === '-') {
+      this.advance();
+      const operator = this.previous().value;
+      const operand = this.unary();
+      return {
+        type: 'unary_expr',
+        operator,
+        operand
+      };
+    }
+
+    // Check for NOT keyword
+    if (this.peek().type === TokenType.KEYWORD && this.peek().value === 'NOT') {
+      this.advance();
+      const operand = this.unary();
+      return {
+        type: 'unary_expr',
+        operator: 'NOT',
+        operand
+      };
+    }
+
+    return this.primary();
+  }
+
+  private primary(): ASTNode {
+    if (this.match(TokenType.NUMBER, TokenType.LINE_NUMBER)) {
+      return {
+        type: 'number',
+        value: this.previous().value
+      };
+    }
+
+    if (this.match(TokenType.STRING)) {
+      return {
+        type: 'string',
+        value: this.previous().value
+      };
+    }
+
+    if (this.match(TokenType.IDENTIFIER, TokenType.KEYWORD)) {
+      const name = this.previous().value;
+      if (this.peek().type === TokenType.PUNCTUATION && this.peek().value === '(') {
+        // Function call
+        this.advance();
+        const args: ASTNode[] = [];
+        if (!(this.peek().type === TokenType.PUNCTUATION && this.peek().value === ')')) {
+          do {
+            args.push(this.expression());
+          } while (this.peek().type === TokenType.PUNCTUATION && this.peek().value === ',' && this.advance());
+        }
+        if (this.peek().type === TokenType.PUNCTUATION && this.peek().value === ')') {
+          this.advance();
+        } else {
+          throw new Error('Expected )');
+        }
+        return {
+          type: 'function',
+          name,
+          args
+        };
+      } else {
+        return {
+          type: 'identifier',
+          name
+        };
+      }
+    }
+
+    if (this.peek().type === TokenType.PUNCTUATION && this.peek().value === '(') {
+      this.advance();
+      const expr = this.expression();
+      if (this.peek().type === TokenType.PUNCTUATION && this.peek().value === ')') {
+        this.advance();
+      } else {
+        throw new Error('Expected )');
+      }
+      return expr;
+    }
+
+    throw new Error('Invalid expression');
+  }
+
+  private match(...types: TokenType[]): boolean {
+    for (const type of types) {
+      if (this.check(type)) {
+        this.advance();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private check(type: TokenType): boolean {
+    return !this.isAtEnd() && this.peek().type === type;
+  }
+
+  private isAtEnd(): boolean {
+    return this.current >= this.tokens.length || this.peek().type === TokenType.EOF;
+  }
+
+  private advance(): Token {
+    if (!this.isAtEnd()) {
+      this.current++;
+    }
+    return this.previous();
+  }
+
+  private peek(): Token {
+    return this.tokens[this.current];
+  }
+
+  private previous(): Token {
+    return this.tokens[this.current - 1];
+  }
+
+  private consume(type: TokenType): Token {
+    if (this.check(type)) {
+      return this.advance();
+    }
+    throw new Error(`Expected ${type}`);
   }
 }

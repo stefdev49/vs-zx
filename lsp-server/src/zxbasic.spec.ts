@@ -22,7 +22,7 @@ describe('ZXBasicLexer', () => {
     const tokens = lexer.tokenize('10 3.14 1E5');
     expect(tokens).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ type: TokenType.NUMBER, value: '10' }),
+        expect.objectContaining({ type: TokenType.LINE_NUMBER, value: '10' }), // First number is line number
         expect.objectContaining({ type: TokenType.NUMBER, value: '3.14' }),
         expect.objectContaining({ type: TokenType.NUMBER, value: '1E5' })
       ])
@@ -66,11 +66,14 @@ describe('ZXBasicLexer', () => {
     expect(tokens.some(t => t.type === TokenType.OPERATOR && t.value === '>=')).toBe(true);
   });
 
-  test('should tokenize logical operators', () => {
+    test('should tokenize logical operators as keywords', () => {
     const tokens = lexer.tokenize('AND OR NOT');
-    expect(tokens.some(t => t.type === TokenType.KEYWORD && t.value === 'AND')).toBe(true);
-    expect(tokens.some(t => t.type === TokenType.KEYWORD && t.value === 'OR')).toBe(true);
-    expect(tokens.some(t => t.type === TokenType.KEYWORD && t.value === 'NOT')).toBe(true);
+    expect(tokens.length).toBeGreaterThan(2); // Should produce multiple tokens
+    const keywords = tokens.filter(t => t.type === TokenType.KEYWORD);
+    expect(keywords.length).toBe(3); // Should have AND, OR, NOT as keywords
+    expect(keywords[0].value).toBe('AND');
+    expect(keywords[1].value).toBe('OR');
+    expect(keywords[2].value).toBe('NOT');
   });
 
   test('should tokenize punctuation', () => {
@@ -79,7 +82,7 @@ describe('ZXBasicLexer', () => {
       expect.arrayContaining([
         expect.objectContaining({ type: TokenType.PUNCTUATION, value: '(' }),
         expect.objectContaining({ type: TokenType.PUNCTUATION, value: ')' }),
-        expect.objectContaining({ type: TokenType.PUNCTUATION, value: ':' }),
+        expect.objectContaining({ type: TokenType.STATEMENT_SEPARATOR, value: ':' }),
         expect.objectContaining({ type: TokenType.PUNCTUATION, value: ',' }),
         expect.objectContaining({ type: TokenType.PUNCTUATION, value: ';' })
       ])
@@ -99,6 +102,56 @@ describe('ZXBasicLexer', () => {
     expect(tokens.some(t => t.type === TokenType.INVALID && t.value === '@')).toBe(true);
   });
 
+  test('should tokenize multi-statement lines with colon separators', () => {
+    const tokens = lexer.tokenize('10 LET A=5: PRINT A: GOTO 20');
+    expect(tokens.filter(t => t.type === TokenType.STATEMENT_SEPARATOR && t.value === ':').length).toBe(2);
+    expect(tokens.some(t => t.type === TokenType.LINE_NUMBER && t.value === '10')).toBe(true);
+    expect(tokens.some(t => t.type === TokenType.KEYWORD && t.value === 'LET')).toBe(true);
+    expect(tokens.some(t => t.type === TokenType.KEYWORD && t.value === 'PRINT')).toBe(true);
+    expect(tokens.some(t => t.type === TokenType.KEYWORD && t.value === 'GOTO')).toBe(true);
+  });
+
+  test('should handle two-word keywords GO TO and GO SUB', () => {
+    // Test single-word forms
+    const tokens1 = lexer.tokenize('10 GOTO 100');
+    expect(tokens1.some(t => t.type === TokenType.KEYWORD && t.value === 'GOTO')).toBe(true);
+    
+    const tokens2 = lexer.tokenize('20 GOSUB 1000');
+    expect(tokens2.some(t => t.type === TokenType.KEYWORD && t.value === 'GOSUB')).toBe(true);
+    
+    // Test two-word forms (should normalize to single word)
+    const tokens3 = lexer.tokenize('30 GO TO 200');
+    expect(tokens3.some(t => t.type === TokenType.KEYWORD && t.value === 'GOTO')).toBe(true);
+    expect(tokens3.filter(t => t.value === 'TO').length).toBe(0); // TO should be consumed
+    
+    const tokens4 = lexer.tokenize('40 GO SUB 2000');
+    expect(tokens4.some(t => t.type === TokenType.KEYWORD && t.value === 'GOSUB')).toBe(true);
+    expect(tokens4.filter(t => t.value === 'SUB').length).toBe(0); // SUB should be consumed
+    
+    // Test GO as identifier when not followed by TO or SUB
+    const tokens5 = lexer.tokenize('50 LET GO = 5');
+    const goToken = tokens5.find(t => t.value === 'GO');
+    expect(goToken).toBeDefined();
+    expect(goToken!.type).toBe(TokenType.IDENTIFIER);
+  });
+
+  test('should handle two-word keyword DEF FN', () => {
+    // Test two-word form (should normalize to single word)
+    const tokens1 = lexer.tokenize('10 DEF FN f(x) = x * 2');
+    expect(tokens1.some(t => t.type === TokenType.KEYWORD && t.value === 'DEFFN')).toBe(true);
+    expect(tokens1.filter(t => t.value === 'FN' && t.type === TokenType.KEYWORD).length).toBe(0); // FN should be consumed by DEFFN
+    
+    // Test DEF alone (keyword, not followed by FN)
+    const tokens2 = lexer.tokenize('20 DEF');
+    const defToken = tokens2.find(t => t.value === 'DEF');
+    expect(defToken).toBeDefined();
+    expect(defToken!.type).toBe(TokenType.KEYWORD); // DEF is a keyword in ZX BASIC
+    
+    // Test FN alone (used in function calls)
+    const tokens3 = lexer.tokenize('30 PRINT FN f(5)');
+    expect(tokens3.some(t => t.type === TokenType.KEYWORD && t.value === 'FN')).toBe(true);
+  });
+
   test('should track line and column positions', () => {
     const tokens = lexer.tokenize('10 PRINT\n20 LET');
 
@@ -111,8 +164,8 @@ describe('ZXBasicLexer', () => {
     const letToken = tokens.find(t => t.value === 'LET');
     expect(letToken).toBeDefined();
     expect(letToken!.line).toBe(1);
-    expect(letToken!.start).toBe(12);
-    expect(letToken!.end).toBe(15);
+    expect(letToken!.start).toBe(4);
+    expect(letToken!.end).toBe(7);
   });
 });
 
@@ -131,9 +184,9 @@ describe('ZXBasicParser', () => {
     const result = parser.parseExpression();
     if (result) {
       expect(result.type).toBe('number');
-      expect(result.value).toBe(42);
+      expect(result.value).toBe('42');
     } else {
-      fail('Result should not be null');
+      throw new Error('Result should not be null');
     }
   });
 
@@ -144,9 +197,9 @@ describe('ZXBasicParser', () => {
     const result = parser.parseExpression();
     if (result) {
       expect(result.type).toBe('string');
-      expect(result.value).toBe('HELLO');
+      expect(result.value).toBe('"HELLO"');
     } else {
-      fail('Result should not be null');
+      throw new Error('Result should not be null');
     }
   });
 
@@ -159,11 +212,11 @@ describe('ZXBasicParser', () => {
       expect(result.type).toBe('binary_expr');
       expect(result.operator).toBe('+');
       if (result.left && result.right) {
-        expect(result.left.value).toBe(10);
-        expect(result.right.value).toBe(5);
+        expect(result.left.value).toBe('10');
+        expect(result.right.value).toBe('5');
       }
     } else {
-      fail('Result should not be null');
+      throw new Error('Result should not be null');
     }
   });
 
@@ -176,11 +229,11 @@ describe('ZXBasicParser', () => {
       expect(result.type).toBe('binary_expr');
       expect(result.operator).toBe('-');
       if (result.left && result.right) {
-        expect(result.left.value).toBe(10);
-        expect(result.right.value).toBe(5);
+        expect(result.left.value).toBe('10');
+        expect(result.right.value).toBe('5');
       }
     } else {
-      fail('Result should not be null');
+      throw new Error('Result should not be null');
     }
   });
 
@@ -193,11 +246,11 @@ describe('ZXBasicParser', () => {
       expect(result.type).toBe('binary_expr');
       expect(result.operator).toBe('*');
       if (result.left && result.right) {
-        expect(result.left.value).toBe(3);
-        expect(result.right.value).toBe(4);
+        expect(result.left.value).toBe('3');
+        expect(result.right.value).toBe('4');
       }
     } else {
-      fail('Result should not be null');
+      throw new Error('Result should not be null');
     }
   });
 
@@ -210,11 +263,11 @@ describe('ZXBasicParser', () => {
       expect(result.type).toBe('binary_expr');
       expect(result.operator).toBe('/');
       if (result.left && result.right) {
-        expect(result.left.value).toBe(8);
-        expect(result.right.value).toBe(2);
+        expect(result.left.value).toBe('8');
+        expect(result.right.value).toBe('2');
       }
     } else {
-      fail('Result should not be null');
+      throw new Error('Result should not be null');
     }
   });
 
@@ -227,11 +280,11 @@ describe('ZXBasicParser', () => {
       expect(result.type).toBe('binary_expr');
       expect(result.operator).toBe('^');
       if (result.left && result.right) {
-        expect(result.left.value).toBe(2);
-        expect(result.right.value).toBe(3);
+        expect(result.left.value).toBe('2');
+        expect(result.right.value).toBe('3');
       }
     } else {
-      fail('Result should not be null');
+      throw new Error('Result should not be null');
     }
   });
 
@@ -244,10 +297,10 @@ describe('ZXBasicParser', () => {
       expect(result.type).toBe('unary_expr');
       expect(result.operator).toBe('-');
       if (result.operand) {
-        expect(result.operand.value).toBe(5);
+        expect(result.operand.value).toBe('5');
       }
     } else {
-      fail('Result should not be null');
+      throw new Error('Result should not be null');
     }
   });
 
@@ -260,18 +313,18 @@ describe('ZXBasicParser', () => {
       expect(result.type).toBe('binary_expr');
       expect(result.operator).toBe('+');
       if (result.left && result.right) {
-        expect(result.left.value).toBe(2);
+        expect(result.left.value).toBe('2');
         expect(result.right.type).toBe('binary_expr');
         if (result.right.operator) {
           expect(result.right.operator).toBe('*');
         }
         if (result.right.left && result.right.right) {
-          expect(result.right.left.value).toBe(3);
-          expect(result.right.right.value).toBe(4);
+          expect(result.right.left.value).toBe('3');
+          expect(result.right.right.value).toBe('4');
         }
       }
     } else {
-      fail('Result should not be null');
+      throw new Error('Result should not be null');
     }
   });
 
@@ -289,13 +342,13 @@ describe('ZXBasicParser', () => {
           expect(result.left.operator).toBe('+');
         }
         if (result.left.left && result.left.right) {
-          expect(result.left.left.value).toBe(2);
-          expect(result.left.right.value).toBe(3);
+          expect(result.left.left.value).toBe('2');
+          expect(result.left.right.value).toBe('3');
         }
-        expect(result.right.value).toBe(4);
+        expect(result.right.value).toBe('4');
       }
     } else {
-      fail('Result should not be null');
+      throw new Error('Result should not be null');
     }
   });
 
@@ -375,7 +428,6 @@ describe('LSP Server Integration', () => {
       const testInput = 'SIN';
       const expectedFunctions = functions.filter(f => f.toLowerCase().startsWith(testInput.toLowerCase()));
       expect(expectedFunctions).toContain('SIN');
-      expect(expectedFunctions).toContain('SGN');
       expect(expectedFunctions).not.toContain('COS');
     });
 
@@ -400,7 +452,7 @@ describe('LSP Server Integration', () => {
 
       expect(filteredKeywords).toContain('PRINT');
       expect(filteredKeywords).not.toContain('LET');
-      expect(filteredKeywords).toHaveLength(3); // PRINT, PR (none), PR (none)
+      expect(filteredKeywords).toHaveLength(1); // PRINT
     });
 
     test('should get keyword documentation', () => {
@@ -546,7 +598,7 @@ describe('ZX BASIC Language Processing', () => {
     const parser = new ZXBasicParser(tokens);
 
     // Should have line number, keywords, etc.
-    expect(tokens.some(t => t.type === TokenType.NUMBER && t.value === '10')).toBe(true);
+    expect(tokens.some(t => t.type === TokenType.LINE_NUMBER && t.value === '10')).toBe(true);
     expect(tokens.some(t => t.type === TokenType.KEYWORD && t.value === 'PRINT')).toBe(true);
     expect(tokens.some(t => t.type === TokenType.STRING && t.value === '"VALUE IS"')).toBe(true);
 

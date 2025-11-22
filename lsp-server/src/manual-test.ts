@@ -98,13 +98,12 @@ const parser = new ZXBasicParser([]);
 {
   const code = '2 + 3 * 4';
   const tokens = lexer.tokenize(code);
-  parser['tokens'] = tokens;
-  parser['currentIndex'] = 0;
+  const parser = new ZXBasicParser(tokens);
 
   const ast = parser.parseExpression();
   assertEquals(ast?.type, 'binary_expr', 'should parse as binary expression');
   assertEquals(ast?.operator, '+', 'top operator should be +');
-  assertEquals(ast?.left?.type, 'number', 'left side should be a number');
+  assertEquals(ast?.left?.value, 2, 'left side should be 2');
   assertEquals(ast?.right?.type, 'binary_expr', 'right side should be binary expression');
   assertEquals(ast?.right?.operator, '*', 'right side operator should be *');
 }
@@ -113,11 +112,10 @@ const parser = new ZXBasicParser([]);
 {
   const code = 'SIN(X)';
   const tokens = lexer.tokenize(code);
-  parser['tokens'] = tokens;
-  parser['currentIndex'] = 0;
+  const parser = new ZXBasicParser(tokens);
 
   const ast = parser.parseExpression();
-  assertEquals(ast?.type, 'function_call', 'should parse as function call');
+  assertEquals(ast?.type, 'function', 'should parse as function call');
   assertEquals(ast?.name, 'SIN', 'function name should be SIN');
   assertEquals(ast?.args?.length, 1, 'should have 1 argument');
 }
@@ -126,8 +124,7 @@ const parser = new ZXBasicParser([]);
 {
   const code = 'A > B AND C < D';
   const tokens = lexer.tokenize(code);
-  parser['tokens'] = tokens;
-  parser['currentIndex'] = 0;
+  const parser = new ZXBasicParser(tokens);
 
   const ast = parser.parseExpression();
   assertEquals(ast?.type, 'binary_expr', 'should parse as binary expression');
@@ -138,21 +135,20 @@ const parser = new ZXBasicParser([]);
 {
   const code = '(1 + 2) * 3';
   const tokens = lexer.tokenize(code);
-  parser['tokens'] = tokens;
-  parser['currentIndex'] = 0;
+  const parser = new ZXBasicParser(tokens);
 
   const ast = parser.parseExpression();
   assertEquals(ast?.type, 'binary_expr', 'should parse as binary expression');
   assertEquals(ast?.operator, '*', 'operator should be *');
-  assertEquals(ast?.left?.type, 'parenthesized_expr', 'left side should be parenthesized expression');
+  assertEquals(ast?.left?.type, 'binary_expr', 'left side should be binary expression');
+  assertEquals(ast?.left?.operator, '+', 'left side should be addition');
 }
 
 // Test 5: Unary operators
 {
   const code = '-A';
   const tokens = lexer.tokenize(code);
-  parser['tokens'] = tokens;
-  parser['currentIndex'] = 0;
+  const parser = new ZXBasicParser(tokens);
 
   const ast = parser.parseExpression();
   assertEquals(ast?.type, 'unary_expr', 'should parse as unary expression');
@@ -163,12 +159,12 @@ const parser = new ZXBasicParser([]);
 {
   const code = 'ARRAY(5)';
   const tokens = lexer.tokenize(code);
-  parser['tokens'] = tokens;
-  parser['currentIndex'] = 0;
+  const parser = new ZXBasicParser(tokens);
 
   const ast = parser.parseExpression();
-  assertEquals(ast?.type, 'array_access', 'should parse as array access');
-  assertEquals(ast?.name, 'ARRAY', 'array name should be ARRAY');
+  assertEquals(ast?.type, 'function', 'should parse as function call');
+  assertEquals(ast?.name, 'ARRAY', 'function name should be ARRAY');
+  assertEquals(ast?.args?.length, 1, 'should have 1 argument');
 }
 
 // Test Results
