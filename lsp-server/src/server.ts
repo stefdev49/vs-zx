@@ -29,6 +29,19 @@ import {
   CodeActionKind,
   TextEdit,
   DocumentFormattingParams,
+  SemanticTokensParams,
+  SemanticTokens,
+  SemanticTokensLegend,
+  RenameParams,
+  WorkspaceEdit,
+  FoldingRangeParams,
+  FoldingRange,
+  CallHierarchyPrepareParams,
+  CallHierarchyItem,
+  CallHierarchyIncomingCallsParams,
+  CallHierarchyOutgoingCallsParams,
+  CallHierarchyIncomingCall,
+  CallHierarchyOutgoingCall,
 } from 'vscode-languageserver/node';
 
 import { TextDocument } from 'vscode-languageserver-textdocument';
@@ -110,6 +123,29 @@ let globalSettings: ExampleSettings = defaultSettings;
 // The settings of all open documents.
 const documentSettings: Map<string, Thenable<ExampleSettings>> = new Map();
 
+// Semantic tokens legend for ZX BASIC
+const semanticTokensLegend: SemanticTokensLegend = {
+  tokenTypes: [
+    'lineNumber',      // Line numbers at start of statements
+    'variable',        // Variable names
+    'stringVariable',  // String variables (with $)
+    'numericVariable', // Numeric variables (with %)
+    'array',           // Array names
+    'function',        // Function names
+    'keyword',         // Keywords
+    'gotoTarget',      // GOTO/GOSUB line number targets
+    'undefined',       // Undefined variables
+    'comment'          // Comments
+  ],
+  tokenModifiers: [
+    'declaration',     // Variable/function declaration
+    'definition',      // Line number definition
+    'readonly',        // Constants
+    'deprecated',      // Deprecated keywords
+    'unused'           // Unused variables
+  ]
+};
+
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
 
@@ -161,7 +197,17 @@ connection.onInitialize((params: InitializeParams) => {
       codeActionProvider: {
         codeActionKinds: [CodeActionKind.QuickFix, CodeActionKind.Refactor]
       },
-      documentFormattingProvider: true
+      documentFormattingProvider: true,
+      semanticTokensProvider: {
+        legend: semanticTokensLegend,
+        full: true,
+        range: true
+      },
+      renameProvider: {
+        prepareProvider: true
+      },
+      foldingRangeProvider: true,
+      callHierarchyProvider: true
     }
   };
 });
@@ -2629,6 +2675,561 @@ function autoRenumberLines(document: TextDocument): TextEdit[] {
 
   return edits;
 }
+
+// Semantic tokens provider for syntax highlighting
+connection.languages.semanticTokens.on(async (params: SemanticTokensParams): Promise<SemanticTokens> => {
+  const document = documents.get(params.textDocument.uri);
+  if (!document) {
+    return { data: [] };
+  }
+
+  const text = document.getText();
+  const lexer = new ZXBasicLexer();
+  const tokens = lexer.tokenize(text);
+  
+  const data: number[] = [];
+  let lastLine = 0;
+  let lastChar = 0;
+
+  // Track variables and line numbers
+  const definedVariables = new Set<string>();
+  const definedLineNumbers = new Set<string>();
+  const usedVariables = new Set<string>();
+  const undefinedVariables = new Set<string>();
+  
+  // First pass: collect defined items
+  for (const token of tokens) {
+    if (token.type === TokenType.LINE_NUMBER) {
+      definedLineNumbers.add(token.value);
+    } else if (token.type === TokenType.KEYWORD && token.value.toUpperCase() === 'LET') {
+      // Next identifier after LET is a variable definition
+      const idx = tokens.indexOf(token);
+      if (idx + 1 < tokens.length && tokens[idx + 1].type === TokenType.IDENTIFIER) {
+        const varName = tokens[idx + 1].value.replace(/[$%]$/, '');
+        definedVariables.add(varName);
+      }
+    } else if (token.type === TokenType.KEYWORD && token.value.toUpperCase() === 'DIM') {
+      // Identifiers after DIM are array declarations
+      let i = tokens.indexOf(token) + 1;
+      while (i < tokens.length && tokens[i].type !== TokenType.STATEMENT_SEPARATOR) {
+        if (tokens[i].type === TokenType.IDENTIFIER) {
+          const arrName = tokens[i].value.replace(/[$%]$/, '');
+          definedVariables.add(arrName);
+        }
+        i++;
+      }
+    } else if (token.type === TokenType.KEYWORD && (token.value.toUpperCase() === 'INPUT' || token.value.toUpperCase() === 'READ')) {
+      // Identifiers after INPUT/READ are variable assignments
+      const idx = tokens.indexOf(token);
+      let i = idx + 1;
+      while (i < tokens.length && tokens[i].type !== TokenType.STATEMENT_SEPARATOR) {
+        if (tokens[i].type === TokenType.IDENTIFIER) {
+          const varName = tokens[i].value.replace(/[$%]$/, '');
+          definedVariables.add(varName);
+        }
+        i++;
+      }
+    }
+  }
+
+  // Generate semantic tokens
+  for (const token of tokens) {
+    if (token.type === TokenType.LINE_NUMBER) {
+      // Line number at start of line
+      const deltaLine = token.line - lastLine;
+      const deltaChar = deltaLine === 0 ? token.start - lastChar : token.start;
+      
+      data.push(deltaLine, deltaChar, token.value.length, 0, 1); // tokenType=0 (lineNumber), modifier=1 (definition)
+      lastLine = token.line;
+      lastChar = token.start + token.value.length;
+    } else if (token.type === TokenType.IDENTIFIER) {
+      const varName = token.value.replace(/[$%]$/, '');
+      let tokenType = 1; // variable (default)
+      let modifier = 0;
+
+      // Determine variable type and modifiers
+      if (token.value.endsWith('$')) {
+        tokenType = 2; // stringVariable
+      } else if (token.value.endsWith('%')) {
+        tokenType = 3; // numericVariable
+      }
+
+      // Check if it's an array (next token is parenthesis)
+      const tokenIdx = tokens.indexOf(token);
+      if (tokenIdx + 1 < tokens.length && tokens[tokenIdx + 1].value === '(') {
+        tokenType = 4; // array
+      }
+
+      // Check if it's defined or undefined
+      if (definedVariables.has(varName)) {
+        // Keep default modifier for defined variables
+      } else {
+        tokenType = 8; // undefined
+      }
+
+      const deltaLine = token.line - lastLine;
+      const deltaChar = deltaLine === 0 ? token.start - lastChar : token.start;
+      
+      data.push(deltaLine, deltaChar, token.value.length, tokenType, modifier);
+      lastLine = token.line;
+      lastChar = token.start + token.value.length;
+    } else if (token.type === TokenType.KEYWORD) {
+      const tokenType = 6; // keyword
+      const modifier = 0;
+
+      const deltaLine = token.line - lastLine;
+      const deltaChar = deltaLine === 0 ? token.start - lastChar : token.start;
+      
+      data.push(deltaLine, deltaChar, token.value.length, tokenType, modifier);
+      lastLine = token.line;
+      lastChar = token.start + token.value.length;
+    } else if (token.type === TokenType.COMMENT) {
+      const tokenType = 9; // comment
+      const modifier = 0;
+
+      const deltaLine = token.line - lastLine;
+      const deltaChar = deltaLine === 0 ? token.start - lastChar : token.start;
+      
+      data.push(deltaLine, deltaChar, token.value.length, tokenType, modifier);
+      lastLine = token.line;
+      lastChar = token.start + token.value.length;
+    }
+  }
+
+  return { data };
+});
+
+// Rename provider for refactoring variables, line numbers, and functions
+connection.onRenameRequest(async (params: RenameParams): Promise<WorkspaceEdit | null> => {
+  const document = documents.get(params.textDocument.uri);
+  if (!document) {
+    return null;
+  }
+
+  const position = params.position;
+  const newName = params.newName;
+  const text = document.getText();
+  const lines = text.split('\n');
+  const lineText = lines[position.line];
+
+  // Get the word at cursor position
+  let wordStart = position.character;
+  let wordEnd = position.character;
+  
+  while (wordStart > 0 && /[A-Za-z0-9_$%]/.test(lineText[wordStart - 1])) {
+    wordStart--;
+  }
+  while (wordEnd < lineText.length && /[A-Za-z0-9_$%]/.test(lineText[wordEnd])) {
+    wordEnd++;
+  }
+  
+  const oldName = lineText.substring(wordStart, wordEnd);
+  if (!oldName) {
+    return null;
+  }
+
+  const edits: TextEdit[] = [];
+
+  // Check if this is a line number (rename GOTO/GOSUB targets)
+  const isLineNumber = /^\d+$/.test(oldName);
+  
+  if (isLineNumber) {
+    // Rename line number - update:
+    // 1. The line number itself
+    // 2. All GOTO/GOSUB references to this line
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const lineMatch = line.match(/^(\d+)\s+/);
+      
+      // Replace line number at start of line
+      if (lineMatch && lineMatch[1] === oldName) {
+        edits.push({
+          range: {
+            start: { line: i, character: 0 },
+            end: { line: i, character: oldName.length }
+          },
+          newText: newName
+        });
+      }
+      
+      // Replace GOTO/GOSUB targets
+      const gotoPattern = new RegExp(`\\b(GOTO|GO\\s+TO|GOSUB|GO\\s+SUB)\\s+${oldName}\\b`, 'gi');
+      let match;
+      while ((match = gotoPattern.exec(line)) !== null) {
+        const keyword = match[1];
+        const targetStart = match.index + keyword.length;
+        
+        // Find the exact position of the line number after the keyword
+        let numStart = targetStart;
+        while (numStart < line.length && /\s/.test(line[numStart])) {
+          numStart++;
+        }
+        
+        edits.push({
+          range: {
+            start: { line: i, character: numStart },
+            end: { line: i, character: numStart + oldName.length }
+          },
+          newText: newName
+        });
+      }
+    }
+  } else {
+    // Rename variable - update all references
+    // Match whole word to avoid partial matches
+    const varPattern = new RegExp(`\\b${oldName.replace(/[$%]/, '\\$|\\%')}\\b`, 'g');
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      let match;
+      const regex = new RegExp(`\\b${oldName}\\b`, 'g');
+      
+      while ((match = regex.exec(line)) !== null) {
+        edits.push({
+          range: {
+            start: { line: i, character: match.index },
+            end: { line: i, character: match.index + oldName.length }
+          },
+          newText: newName
+        });
+      }
+    }
+  }
+
+  return {
+    changes: {
+      [params.textDocument.uri]: edits
+    }
+  };
+});
+
+// Folding ranges provider for FOR...NEXT, subroutines, and DATA blocks
+connection.onFoldingRanges((params: FoldingRangeParams): FoldingRange[] => {
+  const document = documents.get(params.textDocument.uri);
+  if (!document) {
+    return [];
+  }
+
+  const text = document.getText();
+  const lines = text.split('\n');
+  const foldingRanges: FoldingRange[] = [];
+
+  // Track FOR loops
+  const forStack: { keyword: string; startLine: number }[] = [];
+  
+  // Track GOSUB subroutines
+  const subroutines: { startLine: number; lineNumber: string }[] = [];
+  const gosubTargets = new Set<string>();
+
+  // First pass: collect GOSUB targets
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineNumMatch = line.match(/^(\d+)\s+/);
+    if (lineNumMatch) {
+      const lineNum = lineNumMatch[1];
+      
+      // Check for GOSUB/GO SUB calls
+      if (/\b(GOSUB|GO\s+SUB)\s+(\d+)/i.test(line)) {
+        const targetMatch = line.match(/\b(GOSUB|GO\s+SUB)\s+(\d+)/i);
+        if (targetMatch) {
+          gosubTargets.add(targetMatch[2]);
+        }
+      }
+    }
+  }
+
+  // Second pass: identify folding ranges
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineNumMatch = line.match(/^(\d+)\s+/);
+    const lineNum = lineNumMatch ? lineNumMatch[1] : null;
+    const upperLine = line.toUpperCase();
+
+    // FOR...NEXT folding
+    if (/\bFOR\s+/i.test(upperLine)) {
+      forStack.push({ keyword: 'FOR', startLine: i });
+    } else if (/\bNEXT\b/i.test(upperLine)) {
+      if (forStack.length > 0) {
+        const forLoop = forStack.pop();
+        if (forLoop) {
+          foldingRanges.push({
+            startLine: forLoop.startLine,
+            endLine: i,
+            kind: 'region'
+          });
+        }
+      }
+    }
+
+    // GOSUB subroutine folding
+    if (lineNum && gosubTargets.has(lineNum)) {
+      // This line number is a subroutine target
+      subroutines.push({ startLine: i, lineNumber: lineNum });
+    }
+  }
+
+  // Create folding ranges for subroutines (GOSUB target to RETURN)
+  for (const subroutine of subroutines) {
+    // Find the next RETURN after this subroutine
+    let endLine = subroutine.startLine;
+    for (let i = subroutine.startLine + 1; i < lines.length; i++) {
+      if (/\bRETURN\b/i.test(lines[i].toUpperCase())) {
+        endLine = i;
+        break;
+      }
+      
+      // Stop at next subroutine target
+      const nextLineMatch = lines[i].match(/^(\d+)\s+/);
+      if (nextLineMatch && gosubTargets.has(nextLineMatch[1])) {
+        endLine = i - 1;
+        break;
+      }
+    }
+
+    if (endLine > subroutine.startLine) {
+      foldingRanges.push({
+        startLine: subroutine.startLine,
+        endLine: endLine,
+        kind: 'region'
+      });
+    }
+  }
+
+  // DATA block folding (consecutive DATA statements)
+  let dataStart: number | null = null;
+  let lastDataLine = -1;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const upperLine = lines[i].toUpperCase();
+    
+    if (/\bDATA\b/i.test(upperLine)) {
+      if (dataStart === null) {
+        dataStart = i;
+      }
+      lastDataLine = i;
+    } else if (dataStart !== null && i > lastDataLine) {
+      // End of DATA block
+      if (lastDataLine > dataStart) {
+        foldingRanges.push({
+          startLine: dataStart,
+          endLine: lastDataLine,
+          kind: 'region'
+        });
+      }
+      dataStart = null;
+    }
+  }
+
+  // Handle final DATA block if exists
+  if (dataStart !== null && lastDataLine > dataStart) {
+    foldingRanges.push({
+      startLine: dataStart,
+      endLine: lastDataLine,
+      kind: 'region'
+    });
+  }
+
+  return foldingRanges;
+});
+
+// Call hierarchy provider for GOSUB call graphs
+connection.languages.callHierarchy.onPrepare(async (params: CallHierarchyPrepareParams): Promise<CallHierarchyItem[] | null> => {
+  const document = documents.get(params.textDocument.uri);
+  if (!document) {
+    return null;
+  }
+
+  const position = params.position;
+  const text = document.getText();
+  const lines = text.split('\n');
+  const lineText = lines[position.line];
+
+  // Get the word at cursor position
+  let wordStart = position.character;
+  let wordEnd = position.character;
+  
+  while (wordStart > 0 && /[A-Za-z0-9_$%]/.test(lineText[wordStart - 1])) {
+    wordStart--;
+  }
+  while (wordEnd < lineText.length && /[A-Za-z0-9_$%]/.test(lineText[wordEnd])) {
+    wordEnd++;
+  }
+  
+  const word = lineText.substring(wordStart, wordEnd);
+  
+  // Only enable call hierarchy for line numbers (subroutines)
+  if (!/^\d+$/.test(word)) {
+    return null;
+  }
+
+  const lineNumber = word;
+  const lineMatch = lineText.match(/^(\d+)\s+/);
+  
+  if (!lineMatch || lineMatch[1] !== lineNumber) {
+    // Not at a line number position
+    return null;
+  }
+
+  // Create call hierarchy item for this line number
+  const item: CallHierarchyItem = {
+    name: `Line ${lineNumber}`,
+    kind: SymbolKind.Function,
+    uri: params.textDocument.uri,
+    range: {
+      start: position,
+      end: { line: position.line, character: position.character + lineNumber.length }
+    },
+    selectionRange: {
+      start: position,
+      end: { line: position.line, character: position.character + lineNumber.length }
+    }
+  };
+
+  return [item];
+});
+
+// Incoming calls to a subroutine (who calls this line number?)
+connection.languages.callHierarchy.onIncomingCalls(async (params: CallHierarchyIncomingCallsParams): Promise<CallHierarchyIncomingCall[] | null> => {
+  const document = documents.get(params.item.uri);
+  if (!document) {
+    return null;
+  }
+
+  const itemRange = params.item.range;
+  const text = document.getText();
+  const lines = text.split('\n');
+  
+  // Extract the line number from "Line XXX"
+  const lineNumMatch = params.item.name.match(/Line (\d+)/);
+  if (!lineNumMatch) {
+    return null;
+  }
+
+  const targetLineNum = lineNumMatch[1];
+  const incomingCalls: CallHierarchyIncomingCall[] = [];
+
+  // Find all GOSUB/GO SUB calls to this line number
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineNumAtStart = line.match(/^(\d+)\s+/);
+    
+    if (!lineNumAtStart) continue;
+
+    const currentLineNum = lineNumAtStart[1];
+    const gotoPattern = new RegExp(`\\b(GOSUB|GO\\s+SUB)\\s+${targetLineNum}\\b`, 'gi');
+    let match;
+    
+    while ((match = gotoPattern.exec(line)) !== null) {
+      // Create call hierarchy item for the calling line
+      const callerItem: CallHierarchyItem = {
+        name: `Line ${currentLineNum}`,
+        kind: SymbolKind.Function,
+        uri: params.item.uri,
+        range: {
+          start: { line: i, character: 0 },
+          end: { line: i, character: line.length }
+        },
+        selectionRange: {
+          start: { line: i, character: 0 },
+          end: { line: i, character: currentLineNum.length }
+        }
+      };
+
+      // Create incoming call entry
+      incomingCalls.push({
+        from: callerItem,
+        fromRanges: [{
+          start: { line: i, character: match.index },
+          end: { line: i, character: match.index + match[0].length }
+        }]
+      });
+    }
+  }
+
+  return incomingCalls;
+});
+
+// Outgoing calls from a subroutine (what does this line call?)
+connection.languages.callHierarchy.onOutgoingCalls(async (params: CallHierarchyOutgoingCallsParams): Promise<CallHierarchyOutgoingCall[] | null> => {
+  const document = documents.get(params.item.uri);
+  if (!document) {
+    return null;
+  }
+
+  const text = document.getText();
+  const lines = text.split('\n');
+  
+  // Extract the line number from "Line XXX"
+  const lineNumMatch = params.item.name.match(/Line (\d+)/);
+  if (!lineNumMatch) {
+    return null;
+  }
+
+  const currentLineNum = lineNumMatch[1];
+  const outgoingCalls: CallHierarchyOutgoingCall[] = [];
+
+  // Find the line range for this subroutine (from line number to RETURN)
+  let subroutineStart: number | null = null;
+  let subroutineEnd: number = lines.length;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineNumAtStart = line.match(/^(\d+)\s+/);
+    
+    if (lineNumAtStart && lineNumAtStart[1] === currentLineNum) {
+      subroutineStart = i;
+    } else if (subroutineStart !== null && /\bRETURN\b/i.test(line)) {
+      subroutineEnd = i + 1;
+      break;
+    } else if (subroutineStart !== null && lineNumAtStart) {
+      // Stop at next subroutine if we haven't found RETURN
+      subroutineEnd = i;
+      break;
+    }
+  }
+
+  if (subroutineStart === null) {
+    return null;
+  }
+
+  // Collect all GOSUB calls within this subroutine
+  for (let i = subroutineStart; i < subroutineEnd && i < lines.length; i++) {
+    const line = lines[i];
+    const gotoPattern = /\b(GOSUB|GO\s+SUB)\s+(\d+)\b/gi;
+    let match;
+    
+    while ((match = gotoPattern.exec(line)) !== null) {
+      const targetLineNum = match[2];
+      
+      // Create call hierarchy item for the called line
+      const calleeItem: CallHierarchyItem = {
+        name: `Line ${targetLineNum}`,
+        kind: SymbolKind.Function,
+        uri: params.item.uri,
+        range: {
+          start: { line: parseInt(targetLineNum) - 1 < 0 ? 0 : i, character: 0 },
+          end: { line: i, character: line.length }
+        },
+        selectionRange: {
+          start: { line: i, character: match.index },
+          end: { line: i, character: match.index + targetLineNum.length }
+        }
+      };
+
+      // Create outgoing call entry
+      outgoingCalls.push({
+        to: calleeItem,
+        fromRanges: [{
+          start: { line: i, character: match.index },
+          end: { line: i, character: match.index + match[0].length }
+        }]
+      });
+    }
+  }
+
+  return outgoingCalls;
+});
 
 documents.listen(connection);
 connection.listen();
