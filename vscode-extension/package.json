@@ -2,11 +2,12 @@
   "name": "zx-basic-vscode-extension",
   "repository": "git+https://github.com/stef/vs-zx.git",
   "displayName": "ZX BASIC Development Environment",
-  "version": "1.0.25",
+  "version": "1.0.32",
   "description": "VS Code extension for ZX Spectrum BASIC development with Interface 1 transfer",
   "license": "MIT",
   "engines": {
-    "vscode": "^1.74.0"
+    "vscode": "^1.100.0",
+    "node": ">=18"
   },
   "categories": [
     "Languages",
@@ -120,7 +121,7 @@
     "prepare-extension": "cd .. && npm run build:tsc && cd lsp-server && npm run bundle || true && cd ../vscode-extension && npm run bundle && node ./scripts/copy-built.js",
     "clean": "rm -rf out && mkdir -p out && echo 'cleaned'",
     "compile": "tsc -p ./",
-    "bundle": "npx esbuild src/extension.ts --bundle --platform=node --external:vscode --external:serialport --outfile=out/extension.js --target=node16 --sourcemap",
+    "bundle": "npx esbuild src/extension.ts --bundle --platform=node --external:vscode --external:serialport --outfile=out/extension.js --target=node18 --sourcemap",
     "dev": "npm run compile && node ./scripts/copy-built.js",
     "build": "tsc -p ./",
     "watch": "tsc -watch -p ./",
