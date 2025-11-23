@@ -2,11 +2,11 @@
   "name": "zx-basic-vscode-extension",
   "repository": "git+https://github.com/stef/vs-zx.git",
   "displayName": "ZX BASIC Development Environment",
-  "version": "1.0.32",
+  "version": "1.0.44",
   "description": "VS Code extension for ZX Spectrum BASIC development with Interface 1 transfer",
   "license": "MIT",
   "engines": {
-    "vscode": "^1.100.0",
+    "vscode": "^1.94.0",
     "node": ">=18"
   },
   "categories": [
@@ -131,10 +131,10 @@
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.0",
-    "serialport": "^9.0.2"
+    "serialport": "^13.0.0"
   },
   "devDependencies": {
-    "@types/vscode": "^1.74.0",
+    "@types/vscode": "^1.94.0",
     "@types/glob": "^8.0.0",
     "@types/mocha": "^2.2.42",
     "@types/node": ">=20.0.0",
@@ -144,7 +144,7 @@
     "glob": "^8.0.0",
     "mocha": "^10.0.0",
     "typescript": "^4.9.0",
-    "vsce": "^2.0.0",
+    "vsce": "^2.15.0",
     "esbuild": "^0.18.0"
   }
 }

@@ -11,6 +11,7 @@ const out = path.resolve(__dirname, '..', 'out');
 ensureDir(out);
 ensureDir(path.join(out, 'server'));
 ensureDir(path.join(out, 'syntax-definitions'));
+ensureDir(path.join(out, 'syntaxes'));
 
 // Remove converter and rs232-transfer from out if present to avoid duplication
 function removeIfExists(p) {
@@ -39,6 +40,14 @@ if (fs.existsSync(path.join(root, 'syntax-definitions', 'out', 'keywords.js'))) 
   copy('syntax-definitions/out/keywords.js', 'syntax-definitions/keywords.js');
 } else {
   copy('syntax-definitions/keywords.ts', 'syntax-definitions/keywords.ts');
+}
+
+// Copy syntax grammar
+const syntaxSrc = path.join(__dirname, '..', 'syntaxes', 'zx-basic.tmLanguage.json');
+const syntaxDest = path.join(out, 'syntaxes', 'zx-basic.tmLanguage.json');
+if (fs.existsSync(syntaxSrc)) {
+  fs.copyFileSync(syntaxSrc, syntaxDest);
+  console.log('copied syntaxes/zx-basic.tmLanguage.json -> out/syntaxes/zx-basic.tmLanguage.json');
 }
 
   console.log('copy-built complete');

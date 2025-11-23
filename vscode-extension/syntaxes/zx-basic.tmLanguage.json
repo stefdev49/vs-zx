@@ -1,0 +1,132 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "ZX BASIC",
+  "scopeName": "source.zx-basic",
+  "patterns": [
+    {
+      "include": "#line-number"
+    },
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#functions"
+    },
+    {
+      "include": "#operators"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#variables"
+    }
+  ],
+  "repository": {
+    "line-number": {
+      "patterns": [
+        {
+          "match": "^\\s*(\\d+)\\s+",
+          "captures": {
+            "1": {
+              "name": "constant.numeric.line-number.zx-basic"
+            }
+          }
+        }
+      ]
+    },
+    "comments": {
+      "patterns": [
+        {
+          "match": "\\bREM\\b.*$",
+          "name": "comment.line.rem.zx-basic"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "begin": "\"",
+          "end": "\"",
+          "name": "string.quoted.double.zx-basic",
+          "patterns": [
+            {
+              "match": "\\\\.",
+              "name": "constant.character.escape.zx-basic"
+            }
+          ]
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "match": "\\b(PRINT|LET|INPUT|IF|THEN|ELSE|FOR|TO|STEP|NEXT|GOTO|GO TO|GOSUB|GO SUB|RETURN|DIM|READ|DATA|RESTORE|RUN|LIST|CLEAR|NEW|STOP|END|SAVE|LOAD|VERIFY|MERGE|RANDOMIZE|CONTINUE|POKE|PLOT|DRAW|CIRCLE|INK|PAPER|FLASH|BRIGHT|INVERSE|OVER|BORDER|CLS|BEEP|PAUSE|DEF FN|CAT|ERASE|FORMAT|MOVE|OPEN|CLOSE|COPY|LPRINT|LLIST)\\b",
+          "name": "keyword.control.zx-basic"
+        },
+        {
+          "match": "\\b(AND|OR|NOT)\\b",
+          "name": "keyword.operator.logical.zx-basic"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "match": "\\b(ABS|ACS|ASN|ATN|ATTR|CHR\\$|CODE|COS|EXP|FN|IN|INKEY\\$|INT|LEN|LN|PEEK|PI|POINT|RND|SCREEN\\$|SGN|SIN|SQR|STR\\$|TAB|TAN|USR|VAL|VAL\\$)\\b",
+          "name": "support.function.zx-basic"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "match": "(\\+|\\-|\\*|\\/|\\^|=|<>|<=|>=|<|>)",
+          "name": "keyword.operator.arithmetic.zx-basic"
+        },
+        {
+          "match": ":",
+          "name": "punctuation.separator.statement.zx-basic"
+        },
+        {
+          "match": ";",
+          "name": "punctuation.separator.print.zx-basic"
+        },
+        {
+          "match": ",",
+          "name": "punctuation.separator.parameter.zx-basic"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "match": "\\b\\d+(\\.\\d+)?([eE][+-]?\\d+)?\\b",
+          "name": "constant.numeric.zx-basic"
+        }
+      ]
+    },
+    "variables": {
+      "patterns": [
+        {
+          "match": "\\b[a-zA-Z][a-zA-Z0-9_]*\\$",
+          "name": "variable.other.string.zx-basic"
+        },
+        {
+          "match": "\\b[a-zA-Z][a-zA-Z0-9_]*%",
+          "name": "variable.other.integer.zx-basic"
+        },
+        {
+          "match": "\\b[a-zA-Z][a-zA-Z0-9_]*",
+          "name": "variable.other.zx-basic"
+        }
+      ]
+    }
+  }
+}

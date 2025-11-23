@@ -32,6 +32,7 @@ import {
   SemanticTokensParams,
   SemanticTokens,
   SemanticTokensLegend,
+  SemanticTokensRangeParams,
   RenameParams,
   WorkspaceEdit,
   FoldingRangeParams,
@@ -42,6 +43,9 @@ import {
   CallHierarchyOutgoingCallsParams,
   CallHierarchyIncomingCall,
   CallHierarchyOutgoingCall,
+  DocumentDiagnosticReport,
+  DocumentDiagnosticReportKind,
+  DocumentDiagnosticParams,
 } from 'vscode-languageserver/node';
 
 import { TextDocument } from 'vscode-languageserver-textdocument';
@@ -218,11 +222,16 @@ connection.onInitialized(() => {
 
 // Settings changed notification
 connection.onDidChangeConfiguration(change => {
-  if (change.settings.zxBasicLanguageServer) {
+  // Clear document settings cache
+  documentSettings.clear();
+  
+  // Update global settings if available
+  if (change.settings && change.settings.zxBasic) {
     globalSettings = <ExampleSettings>(
-      change.settings.zxBasicLanguageServer || defaultSettings
+      change.settings.zxBasic || defaultSettings
     );
   }
+  
   // Revalidate all open text documents
   documents.all().forEach(validateTextDocument);
 });
@@ -233,7 +242,7 @@ documents.onDidChangeContent(change => {
 });
 
 // Validate document and report diagnostics
-async function validateTextDocument(textDocument: TextDocument): Promise<void> {
+async function validateTextDocument(textDocument: TextDocument): Promise<Diagnostic[]> {
   const settings = await getDocumentSettings(textDocument.uri);
   const text = textDocument.getText();
 
@@ -314,57 +323,102 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
     }
   });
 
-  // Check for FOR/NEXT balance (loose check)
-  const forLoops: Array<{ line: number; start: number; end: number }> = [];
-  const nextStatements: Array<{ line: number; start: number; end: number }> = [];
+  // Check for FOR/NEXT matching with variable tracking
+  const forStack: Array<{ line: number; start: number; end: number; variable: string; tokenIndex: number }> = [];
+  const unmatchedNextStatements: Array<{ line: number; start: number; end: number; variable: string | null }> = [];
   
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i];
     
     if (token.type === TokenType.KEYWORD && token.value === 'FOR') {
-      forLoops.push({
+      // Get the loop variable (next identifier token)
+      let loopVar = '';
+      for (let j = i + 1; j < tokens.length && j < i + 5; j++) {
+        if (tokens[j].type === TokenType.IDENTIFIER) {
+          loopVar = tokens[j].value.replace(/[$%]$/, '').toUpperCase();
+          break;
+        }
+      }
+      
+      forStack.push({
         line: token.line,
         start: token.start,
-        end: token.end
+        end: token.end,
+        variable: loopVar,
+        tokenIndex: i
       });
     } else if (token.type === TokenType.KEYWORD && token.value === 'NEXT') {
-      nextStatements.push({
-        line: token.line,
-        start: token.start,
-        end: token.end
-      });
+      // Get the NEXT variable if specified
+      let nextVar: string | null = null;
+      for (let j = i + 1; j < tokens.length && j < i + 5; j++) {
+        if (tokens[j].type === TokenType.IDENTIFIER) {
+          nextVar = tokens[j].value.replace(/[$%]$/, '').toUpperCase();
+          break;
+        }
+        // Stop at statement separator or colon
+        if (tokens[j].type === TokenType.STATEMENT_SEPARATOR || 
+            (tokens[j].type === TokenType.PUNCTUATION && tokens[j].value === ':')) {
+          break;
+        }
+      }
+      
+      if (forStack.length > 0) {
+        const matchingFor = forStack.pop()!;
+        
+        // Check if NEXT has a variable specified
+        if (nextVar !== null) {
+          // Validate that NEXT variable matches FOR variable
+          if (nextVar !== matchingFor.variable) {
+            diagnostics.push({
+              severity: DiagnosticSeverity.Error,
+              range: {
+                start: { line: token.line, character: token.start },
+                end: { line: token.line, character: token.end + (nextVar ? nextVar.length + 1 : 0) }
+              },
+              message: `NEXT ${nextVar} does not match FOR ${matchingFor.variable} at line ${matchingFor.line + 1}`,
+              source: 'zx-basic-lsp'
+            });
+          }
+        }
+        // If NEXT has no variable, it matches the most recent FOR (which we already popped)
+      } else {
+        // NEXT without matching FOR
+        unmatchedNextStatements.push({
+          line: token.line,
+          start: token.start,
+          end: token.end,
+          variable: nextVar
+        });
+      }
     }
   }
 
-  // Warn if there are FOR loops but no NEXT statements
-  if (forLoops.length > 0 && nextStatements.length === 0) {
-    forLoops.forEach(forLoop => {
-      diagnostics.push({
-        severity: DiagnosticSeverity.Warning,
-        range: {
-          start: { line: forLoop.line, character: forLoop.start },
-          end: { line: forLoop.line, character: forLoop.end }
-        },
-        message: `FOR loop has no matching NEXT statement in the program`,
-        source: 'zx-basic-lsp'
-      });
+  // Report unmatched FOR loops (still on stack)
+  forStack.forEach(forLoop => {
+    diagnostics.push({
+      severity: DiagnosticSeverity.Error,
+      range: {
+        start: { line: forLoop.line, character: forLoop.start },
+        end: { line: forLoop.line, character: forLoop.end }
+      },
+      message: `FOR ${forLoop.variable} has no matching NEXT statement`,
+      source: 'zx-basic-lsp'
     });
-  }
+  });
 
-  // Warn if there are NEXT statements but no FOR loops
-  if (nextStatements.length > 0 && forLoops.length === 0) {
-    nextStatements.forEach(next => {
-      diagnostics.push({
-        severity: DiagnosticSeverity.Warning,
-        range: {
-          start: { line: next.line, character: next.start },
-          end: { line: next.line, character: next.end }
-        },
-        message: `NEXT statement has no matching FOR loop in the program`,
-        source: 'zx-basic-lsp'
-      });
+  // Report unmatched NEXT statements
+  unmatchedNextStatements.forEach(next => {
+    const varInfo = next.variable ? ` ${next.variable}` : '';
+    diagnostics.push({
+      severity: DiagnosticSeverity.Error,
+      range: {
+        start: { line: next.line, character: next.start },
+        end: { line: next.line, character: next.end }
+      },
+      message: `NEXT${varInfo} has no matching FOR loop`,
+      source: 'zx-basic-lsp'
     });
-  }
+  });
 
   // Check for GOSUB/RETURN balance (loose check)
   const gosubStatements: Array<{ line: number; start: number; end: number }> = [];
@@ -458,6 +512,62 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
           message: `IF statement missing THEN keyword`,
           source: 'zx-basic-lsp'
         });
+      }
+    }
+  }
+
+  // Check for DIM with too many dimensions (max 3 in ZX BASIC)
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    
+    if (token.type === TokenType.KEYWORD && token.value === 'DIM') {
+      // Look for array variable name and opening parenthesis
+      let arrayName = '';
+      let isStringArray = false;
+      let parenStart = -1;
+      let parenEnd = -1;
+      
+      for (let j = i + 1; j < tokens.length && j < i + 20; j++) {
+        if (tokens[j].type === TokenType.IDENTIFIER) {
+          arrayName = tokens[j].value;
+          isStringArray = arrayName.endsWith('$');
+        } else if (tokens[j].type === TokenType.PUNCTUATION && tokens[j].value === '(') {
+          parenStart = j;
+        } else if (tokens[j].type === TokenType.PUNCTUATION && tokens[j].value === ')') {
+          parenEnd = j;
+          break;
+        } else if (tokens[j].type === TokenType.STATEMENT_SEPARATOR || 
+                   tokens[j].type === TokenType.LINE_NUMBER) {
+          break;
+        }
+      }
+      
+      if (parenStart !== -1 && parenEnd !== -1) {
+        // Count commas between parentheses (parameters = commas + 1)
+        let paramCount = 1;
+        for (let j = parenStart + 1; j < parenEnd; j++) {
+          if (tokens[j].type === TokenType.PUNCTUATION && tokens[j].value === ',') {
+            paramCount++;
+          }
+        }
+        
+        // For string arrays, last parameter is string length, not a dimension
+        // So max is 4 parameters (3 dimensions + string length)
+        // For numeric arrays, max is 3 parameters (3 dimensions)
+        const maxParams = isStringArray ? 4 : 3;
+        const dimensionType = isStringArray ? 'dimensions + string length' : 'dimensions';
+        
+        if (paramCount > maxParams) {
+          diagnostics.push({
+            severity: DiagnosticSeverity.Error,
+            range: {
+              start: { line: token.line, character: token.start },
+              end: { line: tokens[parenEnd].line, character: tokens[parenEnd].end }
+            },
+            message: `DIM ${arrayName} has too many parameters: found ${paramCount}, maximum is ${maxParams} ${dimensionType}`,
+            source: 'zx-basic-lsp'
+          });
+        }
       }
     }
   }
@@ -788,8 +898,30 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
   // Limit number of diagnostics
   const limitedDiagnostics = diagnostics.slice(0, settings.maxNumberOfProblems);
 
+  // Send diagnostics via push
   connection.sendDiagnostics({ uri: textDocument.uri, diagnostics: limitedDiagnostics });
+  
+  // Return diagnostics for pull requests
+  return limitedDiagnostics;
 }
+
+// Pull diagnostics handler
+connection.languages.diagnostics.on(async (params: DocumentDiagnosticParams): Promise<DocumentDiagnosticReport> => {
+  const document = documents.get(params.textDocument.uri);
+  if (!document) {
+    return {
+      kind: DocumentDiagnosticReportKind.Full,
+      items: []
+    };
+  }
+
+  const diagnostics = await validateTextDocument(document);
+  
+  return {
+    kind: DocumentDiagnosticReportKind.Full,
+    items: diagnostics
+  };
+});
 
 // Context detection for intelligent completion filtering
 interface CompletionContext {
@@ -1099,30 +1231,32 @@ connection.onHover((params: HoverParams): Hover => {
   }
 
   const position = params.position;
-  const lineStart = Math.max(0, position.line - 2);
-  const lineEnd = Math.min(document.lineCount - 1, position.line + 2);
-  const text = document.getText({
-    start: { line: lineStart, character: 0 },
-    end: { line: lineEnd, character: position.character + 50 }
-  });
-
-  // Get the current line text
-  const lineText = document.getText({
+  
+  // Get the full line text
+  const fullLineText = document.getText({
     start: { line: position.line, character: 0 },
-    end: { line: position.line, character: position.character + 20 }
-  });
+    end: { line: position.line + 1, character: 0 }
+  }).replace(/\n$/, '');
 
-  // Extract word at position
-  let endChar = lineText.length - 1;
-  while (endChar >= 0 && /[A-Za-z0-9_$%]/.test(lineText[endChar])) {
-    endChar--;
-  }
-  let startChar = Math.max(0, position.character);
-  while (startChar >= 0 && /[A-Za-z0-9_$%]/.test(lineText[startChar])) {
+  // Extract word at cursor position - search both backward and forward
+  let startChar = position.character;
+  let endChar = position.character;
+  
+  // Move start backward to find word boundary
+  while (startChar > 0 && /[A-Za-z0-9_$%]/.test(fullLineText[startChar - 1])) {
     startChar--;
   }
   
-  const word = lineText.substring(startChar + 1, position.character).toUpperCase();
+  // Move end forward to find word boundary
+  while (endChar < fullLineText.length && /[A-Za-z0-9_$%]/.test(fullLineText[endChar])) {
+    endChar++;
+  }
+  
+  const word = fullLineText.substring(startChar, endChar).toUpperCase();
+  
+  // Debug logging
+  connection.console.log(`Hover debug: position=${position.line}:${position.character}, word="${word}", startChar=${startChar}, endChar=${endChar}`);
+  
   if (!word) {
     return { contents: [] };
   }
@@ -1423,26 +1557,116 @@ function getFunctionSignature(functionName: string): string {
 
 function getHoverDocumentation(keyword: string): string {
   const hoverDocs: { [key: string]: string } = {
+    // Control flow
     'PRINT': 'Print text, numbers, or expressions to the screen\n\n**Syntax:**\n```\nPRINT [TAB(x);] expression [; expression]...\n```\n\n**Examples:**\n```\nPRINT \"HELLO\"\nPRINT A; B; C\nPRINT TAB(10); \"Column 10\"\n```',
     'LET': 'Assign a value to a variable\n\n**Syntax:**\n```\n[LET] variable = expression\n```\n\nThe LET keyword is optional. Variables can be:\n- Numeric: A, X1, MY_VAR\n- String: A$, STR$, NAME$\n- Integer: I%, J%, COUNTER%',
     'IF': 'Conditional statement execution\n\n**Syntax:**\n```\nIF condition THEN statement [ELSE statement]\n```\n\n**Example:**\n```\nIF X > 10 THEN PRINT \"Large\"\nIF X > 10 THEN PRINT \"Large\" ELSE PRINT \"Small\"\n```',
+    'THEN': 'Used with IF to specify the action when condition is true\n\n**Example:**\n```\nIF A = 5 THEN PRINT \"Five\"\n```',
+    'ELSE': 'Specifies alternative action when IF condition is false\n\n**Example:**\n```\nIF A > 0 THEN PRINT \"Positive\" ELSE PRINT \"Not positive\"\n```',
     'FOR': 'Start a FOR loop\n\n**Syntax:**\n```\nFOR variable = start TO end [STEP step]\n...\nNEXT [variable]\n```\n\n**Example:**\n```\nFOR I = 1 TO 10\n  PRINT I\nNEXT I\n```',
+    'TO': 'Specifies the end value in a FOR loop\n\n**Syntax:**\n```\nFOR variable = start TO end\n```',
+    'STEP': 'Specifies the increment in a FOR loop\n\n**Syntax:**\n```\nFOR I = 1 TO 10 STEP 2\n```\n\nDefault STEP is 1. Can be negative.',
+    'NEXT': 'End of a FOR loop\n\n**Syntax:**\n```\nNEXT [variable]\n```\n\n**Example:**\n```\nFOR I = 1 TO 10\n  PRINT I\nNEXT I\n```',
+    'GOTO': 'Jump to a specific line number\n\n**Syntax:**\n```\nGOTO line_number\n```\n\n**Example:**\n```\nGOTO 100\n```\n\nAlso written as GO TO.',
+    'GO TO': 'Jump to a specific line number\n\n**Syntax:**\n```\nGO TO line_number\n```',
+    'GOSUB': 'Call a subroutine at a line number\n\n**Syntax:**\n```\nGOSUB line_number\n```\n\nUse RETURN to return from the subroutine.',
+    'GO SUB': 'Call a subroutine at a line number\n\n**Syntax:**\n```\nGO SUB line_number\n```',
+    'RETURN': 'Return from a GOSUB subroutine\n\n**Syntax:**\n```\nRETURN\n```',
+    'STOP': 'Stop program execution\n\n**Syntax:**\n```\nSTOP\n```\n\nCan be resumed with CONTINUE.',
+    'END': 'End program execution\n\n**Syntax:**\n```\nEND\n```',
+    'CONTINUE': 'Continue execution after STOP\n\n**Syntax:**\n```\nCONTINUE\n```',
+    'RUN': 'Run a program\n\n**Syntax:**\n```\nRUN [line_number]\n```\n\nStarts from beginning or specified line.',
+    
+    // Input/Output
+    'INPUT': 'Read input from keyboard\n\n**Syntax:**\n```\nINPUT [\"prompt\"; ] variable\n```\n\n**Example:**\n```\nINPUT \"Enter name: \"; name$\nINPUT \"Age: \"; age\n```',
+    'REM': 'Comment/remark - ignored during execution\n\n**Syntax:**\n```\nREM comment text\n```\n\n**Example:**\n```\nREM This is a comment\n```',
+    
+    // Data handling
+    'READ': 'Read values from DATA statements\n\n**Syntax:**\n```\nREAD variable [, variable]...\n```\n\n**Example:**\n```\nREAD a, b, c$\n```',
+    'DATA': 'Define data to be read by READ statements\n\n**Syntax:**\n```\nDATA value [, value]...\n```\n\n**Example:**\n```\nDATA 10, 20, \"Hello\"\n```',
+    'RESTORE': 'Reset DATA pointer to beginning\n\n**Syntax:**\n```\nRESTORE [line_number]\n```',
+    'DIM': 'Declare array dimensions\n\n**Syntax:**\n```\nDIM array(size [, size]...)\n```\n\n**Example:**\n```\nDIM a(10)\nDIM matrix(5, 5)\nDIM names$(100)\n```',
+    
+    // Screen control
+    'CLS': 'Clear the screen\n\n**Syntax:**\n```\nCLS\n```',
+    'PLOT': 'Plot a pixel at coordinates\n\n**Syntax:**\n```\nPLOT x, y\n```\n\n**Example:**\n```\nPLOT 128, 96\n```\n\nCoordinates: X: 0-255, Y: 0-175',
+    'DRAW': 'Draw a line from current position\n\n**Syntax:**\n```\nDRAW x, y [, angle]\n```\n\n**Example:**\n```\nDRAW 50, 50\n```\n\nCoordinates are relative to current position.',
+    'CIRCLE': 'Draw a circle\n\n**Syntax:**\n```\nCIRCLE x, y, radius\n```\n\n**Example:**\n```\nCIRCLE 128, 88, 50\n```',
+    'INK': 'Set foreground (text) color\n\n**Syntax:**\n```\nINK color\n```\n\n**Colors:** 0=black, 1=blue, 2=red, 3=magenta, 4=green, 5=cyan, 6=yellow, 7=white',
+    'PAPER': 'Set background color\n\n**Syntax:**\n```\nPAPER color\n```\n\n**Colors:** 0=black, 1=blue, 2=red, 3=magenta, 4=green, 5=cyan, 6=yellow, 7=white',
+    'BORDER': 'Set border color\n\n**Syntax:**\n```\nBORDER color\n```\n\n**Colors:** 0-7',
+    'FLASH': 'Set flashing attribute\n\n**Syntax:**\n```\nFLASH 0 or FLASH 1\n```\n\n0 = off, 1 = on',
+    'BRIGHT': 'Set bright attribute\n\n**Syntax:**\n```\nBRIGHT 0 or BRIGHT 1\n```\n\n0 = normal, 1 = bright',
+    'INVERSE': 'Set inverse video attribute\n\n**Syntax:**\n```\nINVERSE 0 or INVERSE 1\n```\n\n0 = normal, 1 = inverse',
+    'OVER': 'Set overprint mode\n\n**Syntax:**\n```\nOVER 0 or OVER 1\n```\n\n0 = normal, 1 = XOR with existing',
+    
+    // Memory and system
+    'POKE': 'Write a byte to memory address\n\n**Syntax:**\n```\nPOKE address, value\n```\n\n**Example:**\n```\nPOKE 23296, 0\n```',
+    'PEEK': 'Read a byte from memory\n\n**Syntax:**\n```\nPEEK(address) -> number\n```\n\n**Example:**\n```\nLET ATTR = PEEK(22528)\nREM Read screen attributes\n```',
+    'CLEAR': 'Clear variables and set memory limit\n\n**Syntax:**\n```\nCLEAR [address]\n```',
+    'NEW': 'Delete program and clear all variables\n\n**Syntax:**\n```\nNEW\n```',
+    'RANDOMIZE': 'Seed random number generator\n\n**Syntax:**\n```\nRANDOMIZE [seed]\n```\n\nWith no seed, uses timer.',
+    'USR': 'Call machine code routine\n\n**Syntax:**\n```\nUSR address\n```',
+    
+    // Sound
+    'BEEP': 'Make a beep sound\n\n**Syntax:**\n```\nBEEP duration, pitch\n```\n\n**Example:**\n```\nBEEP 0.5, 0\n```\n\nDuration in seconds, pitch in semitones from middle C.',
+    'PLAY': 'Play music (128K only)\n\n**Syntax:**\n```\nPLAY string\n```\n\n**Example:**\n```\nPLAY \"cdefgab\"\n```',
+    
+    // File operations
+    'SAVE': 'Save program or data to tape\n\n**Syntax:**\n```\nSAVE \"filename\"\nSAVE \"filename\" LINE start\nSAVE \"filename\" CODE start, length\nSAVE \"filename\" SCREEN$\n```',
+    'LOAD': 'Load program or data from tape\n\n**Syntax:**\n```\nLOAD \"filename\"\nLOAD \"\" CODE\nLOAD \"\" SCREEN$\n```',
+    'VERIFY': 'Verify saved data\n\n**Syntax:**\n```\nVERIFY \"filename\"\n```',
+    'MERGE': 'Merge program from tape\n\n**Syntax:**\n```\nMERGE \"filename\"\n```',
+    'LIST': 'List program lines\n\n**Syntax:**\n```\nLIST [start] [, end]\n```',
+    'LLIST': 'List to printer (128K)\n\n**Syntax:**\n```\nLLIST [start] [, end]\n```',
+    'LPRINT': 'Print to printer (128K)\n\n**Syntax:**\n```\nLPRINT expression\n```',
+    'COPY': 'Copy screen to printer\n\n**Syntax:**\n```\nCOPY\n```',
+    
+    // Other
+    'PAUSE': 'Pause execution\n\n**Syntax:**\n```\nPAUSE frames\n```\n\n**Example:**\n```\nPAUSE 50  REM Pause for 1 second\nPAUSE 0   REM Wait for key press\n```',
+    'OUT': 'Output to I/O port\n\n**Syntax:**\n```\nOUT port, value\n```',
+    
+    // Math functions
     'SIN': 'Calculate the sine of an angle (in radians)\n\n**Syntax:**\n```\nSIN(angle) -> number\n```\n\n**Example:**\n```\nLET Y = SIN(3.14159 / 2)\nREM Y will be approximately 1\n```',
     'COS': 'Calculate the cosine of an angle (in radians)\n\n**Syntax:**\n```\nCOS(angle) -> number\n```',
-    'LEN': 'Return the length of a string\n\n**Syntax:**\n```\nLEN(string) -> number\n```\n\n**Example:**\n```\nLET L = LEN(\"HELLO\")\nREM L is 5\n```',
-    'VAL': 'Convert a string to a numeric value\n\n**Syntax:**\n```\nVAL(string) -> number\n```\n\n**Example:**\n```\nLET N = VAL(\"123.45\")\nREM N is 123.45\n```',
-    'PEEK': 'Read a byte from memory\n\n**Syntax:**\n```\nPEEK(address) -> number\n```\n\n**Example:**\n```\nLET ATTR = PEEK(22528)\nREM Read screen attributes\n```',
-    'STR$': 'Convert a number to a string\n\n**Syntax:**\n```\nSTR$(number) -> string\n```',
-    'CHR$': 'Return the character for an ASCII code\n\n**Syntax:**\n```\nCHR$(code) -> string\n```',
-    'CODE': 'Return the ASCII code of the first character\n\n**Syntax:**\n```\nCODE(string) -> number\n```',
+    'TAN': 'Calculate the tangent of an angle (in radians)\n\n**Syntax:**\n```\nTAN(angle) -> number\n```',
+    'ASN': 'Arc sine (inverse sine)\n\n**Syntax:**\n```\nASN(x) -> number\n```\n\nReturns angle in radians. x must be -1 to 1.',
+    'ACS': 'Arc cosine (inverse cosine)\n\n**Syntax:**\n```\nACS(x) -> number\n```\n\nReturns angle in radians. x must be -1 to 1.',
+    'ATN': 'Arc tangent (inverse tangent)\n\n**Syntax:**\n```\nATN(x) -> number\n```\n\nReturns angle in radians.',
     'ABS': 'Return the absolute value (remove sign)\n\n**Syntax:**\n```\nABS(number) -> number\n```',
     'INT': 'Return the integer part (floor function)\n\n**Syntax:**\n```\nINT(number) -> number\n```',
     'SQR': 'Return the square root\n\n**Syntax:**\n```\nSQR(number) -> number\n```',
+    'SGN': 'Return the sign of a number\n\n**Syntax:**\n```\nSGN(number) -> number\n```\n\nReturns -1 for negative, 0 for zero, 1 for positive.',
+    'EXP': 'Return e raised to a power\n\n**Syntax:**\n```\nEXP(x) -> number\n```',
+    'LN': 'Return natural logarithm\n\n**Syntax:**\n```\nLN(x) -> number\n```',
     'RND': 'Return a random number between 0 and 1\n\n**Syntax:**\n```\nRND -> number\n```\n\nUse with RANDOMIZE to seed.',
+    'PI': 'Return the value of π (pi)\n\n**Syntax:**\n```\nPI -> number\n```\n\nReturns approximately 3.14159265.',
+    
+    // String functions
+    'LEN': 'Return the length of a string\n\n**Syntax:**\n```\nLEN(string) -> number\n```\n\n**Example:**\n```\nLET L = LEN(\"HELLO\")\nREM L is 5\n```',
+    'VAL': 'Convert a string to a numeric value\n\n**Syntax:**\n```\nVAL(string) -> number\n```\n\n**Example:**\n```\nLET N = VAL(\"123.45\")\nREM N is 123.45\n```',
+    'VAL$': 'Convert string to number (128K)\n\n**Syntax:**\n```\nVAL$(string) -> number\n```',
+    'STR$': 'Convert a number to a string\n\n**Syntax:**\n```\nSTR$(number) -> string\n```',
+    'CHR$': 'Return the character for an ASCII code\n\n**Syntax:**\n```\nCHR$(code) -> string\n```',
+    'CODE': 'Return the ASCII code of the first character\n\n**Syntax:**\n```\nCODE(string) -> number\n```',
+    'INKEY$': 'Read the last key pressed\n\n**Syntax:**\n```\nINKEY$ -> string\n```\n\nReturns empty string if no key was pressed.',
+    'SCREEN$': 'Return character at screen position\n\n**Syntax:**\n```\nSCREEN$(line, column) -> string\n```',
+    
+    // Screen functions
+    'ATTR': 'Return attribute at screen position\n\n**Syntax:**\n```\nATTR(line, column) -> number\n```',
+    'POINT': 'Test if pixel is set\n\n**Syntax:**\n```\nPOINT(x, y) -> number\n```\n\nReturns 1 if pixel is set, 0 otherwise.',
+    
+    // Logical operators
     'AND': 'Logical AND operator\n\n```\ncondition1 AND condition2\n```\n\nTrue only if both conditions are true.',
     'OR': 'Logical OR operator\n\n```\ncondition1 OR condition2\n```\n\nTrue if either condition is true.',
     'NOT': 'Logical NOT operator\n\n```\nNOT condition\n```\n\nReverses the truth value.',
-    'INKEY$': 'Read the last key pressed\n\n**Syntax:**\n```\nINKEY$ -> string\n```\n\nReturns empty string if no key was pressed.',
+    
+    // 128K specific
+    'SPECTRUM': 'Switch 128K ROM mode\n\n**Syntax:**\n```\nSPECTRUM\n```',
+    'CAT': 'Catalog disk directory (128K)\n\n**Syntax:**\n```\nCAT\n```',
+    'ERASE': 'Delete file (128K)\n\n**Syntax:**\n```\nERASE \"filename\"\n```',
+    'FORMAT': 'Format disk (128K/Interface 1)\n\n**Syntax:**\n```\nFORMAT \"name\"\n```',
+    'MOVE': 'Move file (128K)\n\n**Syntax:**\n```\nMOVE \"from\" TO \"to\"\n```',
   };
   return hoverDocs[keyword] || '';
 }
@@ -2764,6 +2988,127 @@ connection.languages.semanticTokens.on(async (params: SemanticTokensParams): Pro
       if (definedVariables.has(varName)) {
         // Keep default modifier for defined variables
       } else {
+        tokenType = 8; // undefined
+      }
+
+      const deltaLine = token.line - lastLine;
+      const deltaChar = deltaLine === 0 ? token.start - lastChar : token.start;
+      
+      data.push(deltaLine, deltaChar, token.value.length, tokenType, modifier);
+      lastLine = token.line;
+      lastChar = token.start + token.value.length;
+    } else if (token.type === TokenType.KEYWORD) {
+      const tokenType = 6; // keyword
+      const modifier = 0;
+
+      const deltaLine = token.line - lastLine;
+      const deltaChar = deltaLine === 0 ? token.start - lastChar : token.start;
+      
+      data.push(deltaLine, deltaChar, token.value.length, tokenType, modifier);
+      lastLine = token.line;
+      lastChar = token.start + token.value.length;
+    } else if (token.type === TokenType.COMMENT) {
+      const tokenType = 9; // comment
+      const modifier = 0;
+
+      const deltaLine = token.line - lastLine;
+      const deltaChar = deltaLine === 0 ? token.start - lastChar : token.start;
+      
+      data.push(deltaLine, deltaChar, token.value.length, tokenType, modifier);
+      lastLine = token.line;
+      lastChar = token.start + token.value.length;
+    }
+  }
+
+  return { data };
+});
+
+// Semantic tokens range provider
+connection.languages.semanticTokens.onRange(async (params: SemanticTokensRangeParams): Promise<SemanticTokens> => {
+  const document = documents.get(params.textDocument.uri);
+  if (!document) {
+    return { data: [] };
+  }
+
+  const text = document.getText();
+  const lexer = new ZXBasicLexer();
+  const tokens = lexer.tokenize(text);
+  
+  const data: number[] = [];
+  let lastLine = 0;
+  let lastChar = 0;
+
+  // Track variables and line numbers
+  const definedVariables = new Set<string>();
+  const definedLineNumbers = new Set<string>();
+  
+  // First pass: collect defined items (same as full handler)
+  for (const token of tokens) {
+    if (token.type === TokenType.LINE_NUMBER) {
+      definedLineNumbers.add(token.value);
+    } else if (token.type === TokenType.KEYWORD && token.value.toUpperCase() === 'LET') {
+      const idx = tokens.indexOf(token);
+      if (idx + 1 < tokens.length && tokens[idx + 1].type === TokenType.IDENTIFIER) {
+        const varName = tokens[idx + 1].value.replace(/[$%]$/, '');
+        definedVariables.add(varName);
+      }
+    } else if (token.type === TokenType.KEYWORD && token.value.toUpperCase() === 'DIM') {
+      let i = tokens.indexOf(token) + 1;
+      while (i < tokens.length && tokens[i].type !== TokenType.STATEMENT_SEPARATOR) {
+        if (tokens[i].type === TokenType.IDENTIFIER) {
+          const arrName = tokens[i].value.replace(/[$%]$/, '');
+          definedVariables.add(arrName);
+        }
+        i++;
+      }
+    } else if (token.type === TokenType.KEYWORD && (token.value.toUpperCase() === 'INPUT' || token.value.toUpperCase() === 'READ')) {
+      const idx = tokens.indexOf(token);
+      let i = idx + 1;
+      while (i < tokens.length && tokens[i].type !== TokenType.STATEMENT_SEPARATOR) {
+        if (tokens[i].type === TokenType.IDENTIFIER) {
+          const varName = tokens[i].value.replace(/[$%]$/, '');
+          definedVariables.add(varName);
+        }
+        i++;
+      }
+    }
+  }
+
+  // Filter tokens within the requested range
+  const rangeStart = params.range.start.line;
+  const rangeEnd = params.range.end.line;
+
+  // Generate semantic tokens only for the requested range
+  for (const token of tokens) {
+    // Skip tokens outside the range
+    if (token.line < rangeStart || token.line > rangeEnd) {
+      continue;
+    }
+
+    if (token.type === TokenType.LINE_NUMBER) {
+      const deltaLine = token.line - lastLine;
+      const deltaChar = deltaLine === 0 ? token.start - lastChar : token.start;
+      
+      data.push(deltaLine, deltaChar, token.value.length, 0, 1);
+      lastLine = token.line;
+      lastChar = token.start + token.value.length;
+    } else if (token.type === TokenType.IDENTIFIER) {
+      const varName = token.value.replace(/[$%]$/, '');
+      let tokenType = 1; // variable (default)
+      let modifier = 0;
+
+      if (token.value.endsWith('$')) {
+        tokenType = 2; // stringVariable
+      } else if (token.value.endsWith('%')) {
+        tokenType = 3; // numericVariable
+      }
+
+      const tokenIdx = tokens.indexOf(token);
+      if (tokenIdx + 1 < tokens.length && tokens[tokenIdx + 1].value === '(') {
+        tokenType = 4; // array
+      }
+
+      if (!definedVariables.has(varName)) {
         tokenType = 8; // undefined
       }
 
