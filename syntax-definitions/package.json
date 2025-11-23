@@ -2,12 +2,12 @@
   "name": "syntax-definitions",
   "version": "1.0.0",
   "description": "ZX BASIC syntax definitions and keywords",
-  "main": "keywords.ts",
-  "types": "keywords.ts",
+  "main": "out/keywords",
+  "types": "out/keywords",
   "scripts": {
-    "build": "echo 'No build needed'"
+    "build": "tsc -p ./"
   },
-  "devDependencies": {
-    "@types/node": "^20.0.0"
+  "engines": {
+    "node": ">=18"
   }
 }

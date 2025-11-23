@@ -19,12 +19,17 @@
     "@types/jest": "^29.0.0",
     "ts-jest": "^29.0.0"
   },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "npm run build --workspaces",
     "build:tsc": "tsc --build",
+    "rebuild-native": "npm --workspaces rebuild --build-from-source || true",
+    "rebuild-electron": "node -e \"if(!process.env.ELECTRON_VERSION){console.error('Set ELECTRON_VERSION env var');process.exit(1);}\" && npx electron-rebuild -f -w serialport -v $ELECTRON_VERSION || true",
     "test": "npm run test --workspaces",
     "lint": "npm run lint --workspaces",
     "format": "prettier --write .",
-    "package": "cd vscode-extension && npm version patch --no-git-tag-version --force && cd .. && npm run build:tsc && cd vscode-extension && npx vsce package --no-dependencies && echo 'VS Code extension packaged successfully in vscode-extension/'"
+    "package": "cd vscode-extension && npm version patch --no-git-tag-version && cd .. && npm run rebuild-native && cd vscode-extension && npx vsce package --no-dependencies && echo 'VS Code extension packaged successfully in vscode-extension/'"
   }
 }

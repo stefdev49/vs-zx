@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      electron_version:
+        description: 'Electron version to rebuild native modules (optional)'
+        required: false
+        default: ''
 
 jobs:
   build-package:
@@ -18,8 +23,22 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install
+      - name: Install system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libsecret-1-dev build-essential python3
+
+      - name: Install node modules
         run: npm ci
+
+      - name: Rebuild native modules for Node
+        run: npm run rebuild-native
+
+      - name: Rebuild native modules for Electron (optional)
+        if: ${{ github.event.inputs.electron_version != '' }}
+        run: npm run rebuild-electron
+        env:
+          ELECTRON_VERSION: ${{ github.event.inputs.electron_version }}
 
       - name: Build TypeScript projects
         run: npm run build:tsc

@@ -7,10 +7,13 @@
     "zx-lsp-server": "./out/server.js"
   },
   "scripts": {
-    "build": "tsc",
-    "bundle": "npx esbuild src/server.ts --bundle --platform=node --outfile=out/server.js --target=node16 --sourcemap",
+    "build": "tsc -p ./",
+    "bundle": "npx esbuild src/server.ts --bundle --platform=node --outfile=out/server.js --target=node18 --sourcemap",
     "start": "node out/server.js",
     "test": "jest --coverage --no-watch"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "dependencies": {
     "vscode-languageserver": "^9.0.0",
@@ -21,8 +24,7 @@
     "@types/jest": "^29.0.0",
     "@types/node": "^20.0.0",
     "jest": "^29.0.0",
-    "ts-jest": "^29.0.0"
-  ,
+    "ts-jest": "^29.0.0",
     "esbuild": "^0.18.0"
   }
 }

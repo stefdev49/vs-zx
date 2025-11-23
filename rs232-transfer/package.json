@@ -5,12 +5,17 @@
   "main": "out/index.js",
   "scripts": {
     "build": "tsc",
+    "bundle": "npx esbuild src/index.ts --bundle --platform=node --external:serialport --outfile=out/index.js --target=node18 --sourcemap",
     "test": "jest"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "dependencies": {
     "serialport": "^9.0.2"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0"
+    "@types/node": "^20.0.0",
+    "esbuild": "^0.18.0"
   }
 }

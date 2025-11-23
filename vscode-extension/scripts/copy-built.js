@@ -35,8 +35,8 @@ function copy(srcRel, destRel) {
 }
 
 copy('lsp-server/out/server.js', 'server/server.js');
-if (fs.existsSync(path.join(root, 'syntax-definitions', 'keywords.js'))) {
-  copy('syntax-definitions/keywords.js', 'syntax-definitions/keywords.js');
+if (fs.existsSync(path.join(root, 'syntax-definitions', 'out', 'keywords.js'))) {
+  copy('syntax-definitions/out/keywords.js', 'syntax-definitions/keywords.js');
 } else {
   copy('syntax-definitions/keywords.ts', 'syntax-definitions/keywords.ts');
 }
