@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./syntax-definitions" },
+    { "path": "./converter" },
+    { "path": "./lsp-server" },
+    { "path": "./rs232-transfer" },
+    { "path": "./vscode-extension" }
+  ]
+}

@@ -4,6 +4,9 @@
   "exclude": ["node_modules", "out"],
   "compilerOptions": {
     "rootDir": "./src",
-    "outDir": "./out"
+    "outDir": "./out",
+    "composite": true,
+    "tsBuildInfoFile": "out/tsconfig.tsbuildinfo",
+    "declaration": true
   }
 }

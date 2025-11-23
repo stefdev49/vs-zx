@@ -7,6 +7,9 @@
     "outDir": "./out",
     "paths": {
       "syntax-definitions": ["../syntax-definitions/keywords.ts"]
-    }
+    },
+    "composite": true,
+    "tsBuildInfoFile": "out/tsconfig.tsbuildinfo",
+    "declaration": true
   }
 }

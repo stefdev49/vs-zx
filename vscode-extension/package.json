@@ -2,7 +2,7 @@
   "name": "zx-basic-vscode-extension",
   "repository": "git+https://github.com/stef/vs-zx.git",
   "displayName": "ZX BASIC Development Environment",
-  "version": "1.0.11",
+  "version": "1.0.22",
   "description": "VS Code extension for ZX Spectrum BASIC development with Interface 1 transfer",
   "license": "MIT",
   "engines": {
@@ -116,9 +116,12 @@
   ],
   "main": "./out/extension.js",
   "scripts": {
-    "vscode:prepublish": "cd .. && npm run build && cd vscode-extension && npm run compile && mkdir -p out/server out/converter out/rs232-transfer out/syntax-definitions && cp ../lsp-server/out/server.js out/server/ && cp ../converter/out/index.js out/converter/ && cp ../rs232-transfer/out/index.js out/rs232-transfer/ && (cp ../syntax-definitions/keywords.js out/syntax-definitions/ || cp ../syntax-definitions/keywords.ts out/syntax-definitions/) && sed -i 's#require(\"syntax-definitions/keywords\")#require(\"../syntax-definitions/keywords\")#g' out/converter/index.js",
+    "vscode:prepublish": "npm run prepare-extension",
+    "prepare-extension": "cd .. && npm run build:tsc && cd lsp-server && npm run bundle || true && cd ../vscode-extension && npm run bundle && node ./scripts/copy-built.js",
+    "clean": "rm -rf out && mkdir -p out && echo 'cleaned'",
     "compile": "tsc -p ./",
-    "dev": "npm run compile && mkdir -p out/server out/converter out/rs232-transfer out/syntax-definitions && cp ../lsp-server/out/server.js out/server/ && cp ../converter/out/index.js out/converter/ && cp ../rs232-transfer/out/index.js out/rs232-transfer/ && (cp ../syntax-definitions/keywords.js out/syntax-definitions/ || cp ../syntax-definitions/keywords.ts out/syntax-definitions/) && sed -i 's#require(\"syntax-definitions/keywords\")#require(\"../syntax-definitions/keywords\")#g' out/converter/index.js",
+    "bundle": "npx esbuild src/extension.ts --bundle --platform=node --external:vscode --external:serialport --outfile=out/extension.js --target=node16 --sourcemap",
+    "dev": "npm run compile && node ./scripts/copy-built.js",
     "build": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
@@ -140,6 +143,7 @@
     "glob": "^8.0.0",
     "mocha": "^10.0.0",
     "typescript": "^4.9.0",
-    "vsce": "^2.0.0"
+    "vsce": "^2.0.0",
+    "esbuild": "^0.18.0"
   }
 }

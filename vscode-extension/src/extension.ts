@@ -52,8 +52,8 @@ export function activate(context: ExtensionContext) {
 	// Start the client. This will also launch the server
 	client.start();
 
-	// Register command for transfer
-	const transferCmd = require('../out/commands/transfer');
+	// Register command for transfer (use source so bundler can include it)
+	const transferCmd = require('./commands/transfer');
 	context.subscriptions.push(transferCmd.register());
 }
 

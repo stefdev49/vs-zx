@@ -1,0 +1,12 @@
+src/
+scripts/
+**/*.map
+out/**/*.ts
+out/**/*.tsx
+out/**/*.map
+**/node_modules
+.git
+.github
+README.md
+tests/
+*.log

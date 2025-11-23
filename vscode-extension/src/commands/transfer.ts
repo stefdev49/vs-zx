@@ -2,9 +2,9 @@ import { commands, ExtensionContext, window, workspace } from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 
-// Import converter and rs232 modules (when built)
-const converter = require('../out/converter/index');
-const rs232 = require('../out/rs232-transfer/index');
+// Import converter and rs232 modules directly from source so bundler can include them
+const converter = require('converter');
+const rs232 = require('rs232-transfer');
 
 export function register(): ExtensionContext['subscriptions'][0] {
   const disposable = commands.registerCommand('zx-basic.transfer', async () => {
