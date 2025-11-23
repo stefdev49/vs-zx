@@ -5,46 +5,18 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { basicToTap as bas2tapBasicToTap, createTapFile as bas2tapCreateTapFile } from './bas2tap';
 
-// TAP Format
+// BAS2TAP library - re-export all functions
 export {
-  TapBlock,
-  TapHeader,
-  createHeaderBlock,
-  createDataBlock,
+  Bas2TapOptions,
+  Bas2TapResult,
+  basicToTap,
   createTapFile,
-  parseTapFile,
-  getTapMetadata,
-  verifyTapChecksums
-} from './tap-format';
-
-// BASIC Compiler
-export {
-  CompileOptions,
-  CompileResult,
-  isZxbasicAvailable,
-  getZxbasicVersion,
-  compileBASIC,
-  compileBasicFile,
-  validateBasicSyntax,
-  getCompilerCapabilities,
-  compileOptimized,
-  compileWithDebug
-} from './zxbasic-compiler';
-
-// BASIC Conversion
-export {
-  ConversionOptions,
-  ConversionResult,
-  convertBasicToBinary,
-  convertBasicStringToBinary,
-  convertBasicBatch,
-  getBasicFileInfo
-} from './basic-converter';
-
-// Import implementations for direct use
-import { createTapFile } from './tap-format';
-import { compileBASIC } from './zxbasic-compiler';
+  tapToBasic,
+  verifyTapChecksums,
+  convertBasicToTap
+} from './bas2tap';
 
 // Version
 export const VERSION = '1.0.0';
@@ -64,62 +36,54 @@ export interface ProgramMetadata {
 export type FileFormat = 'raw' | 'tap';
 
 /**
- * Convert BASIC text to TAP file format
+ * Convert BASIC text to TAP file format (using native bas2tap)
  */
-export async function convertToTap(
+export function convertToTap(
   basicText: string,
   metadata: ProgramMetadata
-): Promise<Buffer> {
-  // Compile BASIC code to binary
-  const result = await compileBASIC(basicText, { optimize: false });
-
-  if (!result.success || !result.binary) {
-    throw new Error(result.error || 'Failed to compile BASIC code');
+): Buffer {
+  // Use native bas2tap implementation
+  const result = bas2tapBasicToTap(basicText, {
+    programName: metadata.name,
+    autostart: metadata.autostart,
+    suppressWarnings: true
+  });
+  if (!result.success || !result.tap) {
+    throw new Error(result.error || 'Failed to convert BASIC');
   }
-
-  // Create TAP file
-  return createTapFile(
-    result.binary,
-    metadata.name,
-    metadata.autostart
-  );
+  return result.tap;
 }
 
 /**
  * Convert BASIC text to raw binary format (tokenized BASIC only)
  */
-export async function convertToRaw(basicText: string): Promise<Buffer> {
-  // Compile BASIC code to binary
-  const result = await compileBASIC(basicText, { optimize: false });
-
-  if (!result.success || !result.binary) {
-    throw new Error(result.error || 'Failed to compile BASIC code');
+export function convertToRaw(basicText: string): Buffer {
+  // Use native bas2tap tokenization
+  const result = bas2tapBasicToTap(basicText, { suppressWarnings: true });
+  if (!result.success || !result.tap) {
+    throw new Error(result.error || 'Failed to convert BASIC');
   }
-
-  // Return raw binary data (no TAP wrapper)
-  return result.binary;
+  return result.tap;
 }
 
 /**
  * Convert BASIC text to binary (alias for convertToRaw)
  */
-export async function convertToBinary(basicText: string): Promise<Buffer> {
+export function convertToBinary(basicText: string): Buffer {
   return convertToRaw(basicText);
 }
 
 /**
- * Initialize converter with version check
+ * Initialize converter
  */
 export function initialize(): {
   initialized: boolean;
-  zxbasicAvailable: boolean;
   version: string;
+  using: string;
 } {
-  const { isZxbasicAvailable, getZxbasicVersion } = require('./zxbasic-compiler');
-
   return {
     initialized: true,
-    zxbasicAvailable: isZxbasicAvailable(),
-    version: VERSION
+    version: VERSION,
+    using: 'native bas2tap implementation'
   };
 }

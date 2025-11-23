@@ -1,6 +1,6 @@
 /**
  * ZX BASIC Compiler Integration
- * Provides TypeScript wrapper around zxbasic compiler
+ * Provides TypeScript wrapper around bas2tap and zxbasic compilers
  */
 
 import { execSync } from 'child_process';
@@ -26,6 +26,59 @@ export interface CompileResult {
     dataSize: number;
     totalSize: number;
   };
+}
+
+/**
+ * Check if bas2tap compiler is available
+ */
+export function isBas2tapAvailable(): boolean {
+  try {
+    execSync('which bas2tap || true', { stdio: 'pipe', shell: '/bin/bash' });
+    // Try to find bas2tap in the project
+    const bas2tapPath = path.join(__dirname, '../../extras/bas2tap/bas2tap');
+    if (fs.existsSync(bas2tapPath)) {
+      return true;
+    }
+    // Also try in PATH
+    try {
+      execSync('bas2tap --help 2>/dev/null || true', { 
+        stdio: 'pipe',
+        shell: '/bin/bash'
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get bas2tap compiler path
+ */
+export function getBas2tapPath(): string | null {
+  // Try local project path first
+  const localPath = path.join(__dirname, '../../extras/bas2tap/bas2tap');
+  if (fs.existsSync(localPath) && fs.statSync(localPath).isFile()) {
+    return localPath;
+  }
+  
+  // Try to find in PATH
+  try {
+    const result = execSync('which bas2tap 2>/dev/null', { 
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'ignore'],
+      shell: '/bin/bash'
+    }).trim();
+    if (result) {
+      return result;
+    }
+  } catch {
+    // Not found in PATH
+  }
+  
+  return null;
 }
 
 /**
