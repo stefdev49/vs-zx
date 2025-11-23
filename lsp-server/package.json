@@ -8,7 +8,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "bundle": "npx esbuild src/server.ts --bundle --platform=node --external:vscode-languageserver --outfile=out/server.js --target=node16 --sourcemap",
+    "bundle": "npx esbuild src/server.ts --bundle --platform=node --outfile=out/server.js --target=node16 --sourcemap",
     "start": "node out/server.js",
     "test": "jest --coverage --no-watch"
   },
