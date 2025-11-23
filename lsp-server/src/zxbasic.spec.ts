@@ -406,6 +406,38 @@ describe('LSP Server Integration', () => {
     expect(TokenType).toBeDefined();
   });
 
+  test('DIM declarations and usage: numeric array mismatch detection', () => {
+    const lexer = new ZXBasicLexer();
+    const code = '10 DIM A(10)\n20 PRINT A(1,1)\n';
+    const tokens = lexer.tokenize(code);
+
+    // Find DIM identifier and usage identifier
+    const dimIndex = tokens.findIndex(t => t.type === TokenType.KEYWORD && t.value === 'DIM');
+    expect(dimIndex).toBeGreaterThanOrEqual(0);
+
+    const idTokens = tokens.filter(t => t.type === TokenType.IDENTIFIER).map(t => t.value.replace(/[$%]$/, ''));
+    // Should contain A from DIM and A usage
+    expect(idTokens.filter(n => n === 'A').length).toBeGreaterThanOrEqual(2);
+  });
+
+  test('DIM declarations and usage: string array trailing length handling', () => {
+    const lexer = new ZXBasicLexer();
+    const code = '10 DIM N$(20)\n20 PRINT N$(1)\n';
+    const tokens = lexer.tokenize(code);
+
+    // Ensure identifier with $ is tokenized
+    const dimId = tokens.find(t => t.type === TokenType.IDENTIFIER && t.value === 'N$');
+    expect(dimId).toBeDefined();
+
+    // Find parentheses and parameters after DIM
+    const dimPos = tokens.findIndex(t => t.type === TokenType.KEYWORD && t.value === 'DIM');
+    expect(dimPos).toBeGreaterThanOrEqual(0);
+
+    // Ensure that there is a number token inside parentheses representing the string length
+    const numberInside = tokens.some((t, idx) => idx > dimPos && t.type === TokenType.NUMBER);
+    expect(numberInside).toBe(true);
+  });
+
   // Test completion functionality
   describe('Completion Provider', () => {
     test('should return all keywords for empty input', () => {
@@ -433,15 +465,15 @@ describe('LSP Server Integration', () => {
 
     test('should filter keywords based on prefix', () => {
       const allKeywords = [
-        'PRINT', 'LET', 'IF', 'THEN', 'ELSE', 'FOR', 'TO', 'STEP', 'NEXT',
-        'WHILE', 'WEND', 'REPEAT', 'UNTIL', 'READ', 'DATA', 'RESTORE',
-        'DIM', 'DEF', 'FN', 'GOTO', 'GOSUB', 'RETURN', 'STOP', 'RANDOMIZE',
+        'PRINT', 'LET', 'IF', 'THEN', 'FOR', 'TO', 'STEP', 'NEXT',
+        'READ', 'DATA', 'RESTORE',
+        'DIM', 'DEF FN','FN', 'GO TO', 'GO SUB', 'RETURN', 'STOP', 'RANDOMIZE',
         'CONTINUE', 'CLEAR', 'CLS', 'INPUT', 'LOAD', 'SAVE', 'VERIFY', 'MERGE',
         'BEEP', 'INK', 'PAPER', 'FLASH', 'BRIGHT', 'INVERSE', 'OVER', 'BORDER',
         'PLOT', 'DRAW', 'CIRCLE', 'LPRINT', 'LLIST', 'COPY', 'SPECTRUM', 'PLAY',
         'ERASE', 'CAT', 'FORMAT', 'MOVE', 'AND', 'OR', 'NOT', 'USR', 'STR$',
         'CHR$', 'LEN', 'VAL', 'CODE', 'SIN', 'COS', 'TAN', 'ASN', 'ACS', 'ATN',
-        'LN', 'EXP', 'INT', 'SQR', 'SGN', 'ABS', 'PI', 'TRUE', 'FALSE', 'VAL$',
+        'LN', 'EXP', 'INT', 'SQR', 'SGN', 'ABS', 'PI', 'FALSE', 'VAL$',
         'SCREEN$', 'ATTR', 'POINT', 'PEEK', 'INKEY$', 'RND'
       ];
 

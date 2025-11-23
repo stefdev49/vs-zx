@@ -150,6 +150,29 @@ const semanticTokensLegend: SemanticTokensLegend = {
   ]
 };
 
+// Semantic token type indices - must match `semanticTokensLegend.tokenTypes` order
+const SEMANTIC = {
+  LINE_NUMBER: 0,
+  VARIABLE: 1,
+  STRING_VARIABLE: 2,
+  NUMERIC_VARIABLE: 3,
+  ARRAY: 4,
+  FUNCTION: 5,
+  KEYWORD: 6,
+  GOTO_TARGET: 7,
+  UNDEFINED: 8,
+  COMMENT: 9
+} as const;
+
+// Semantic token modifier indices - must match `semanticTokensLegend.tokenModifiers` order
+const SEMANTIC_MOD = {
+  DECLARATION: 0,
+  DEFINITION: 1,
+  READONLY: 2,
+  DEPRECATED: 3,
+  UNUSED: 4
+} as const;
+
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
 
@@ -622,7 +645,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<Diagnos
   }
 
   // Check for array dimension validation (DIM declares vs usage)
-  const dimDeclarations = new Map<string, { line: number; dimensions: number }>();
+  const dimDeclarations = new Map<string, { line: number; dimensions: number; isString: boolean }>();
   const arrayUsages = new Map<string, Array<{ line: number; usedDimensions: number }>>();
   
   // First pass: collect all DIM declarations
@@ -656,22 +679,30 @@ async function validateTextDocument(textDocument: TextDocument): Promise<Diagnos
             dimensionCount++; // At least one dimension
             
             // Check if dimension count exceeds ZX BASIC limit (max 3 dimensions)
-            if (dimensionCount > 3) {
-              diagnostics.push({
-                severity: DiagnosticSeverity.Error,
-                range: {
-                  start: { line: idToken.line, character: idToken.start },
-                  end: { line: idToken.line, character: i }
-                },
-                message: `Array '${arrayName}' declares ${dimensionCount} dimensions, but ZX BASIC maximum is 3`,
-                source: 'zx-basic-lsp'
-              });
-            }
-            
-            // Store the declaration
-            if (!dimDeclarations.has(arrayName)) {
-              dimDeclarations.set(arrayName, { line: idToken.line, dimensions: dimensionCount });
-            }
+                // Determine if the declared identifier was a string array (had $ suffix)
+                const rawName = idToken.value;
+                const isStringArray = rawName.endsWith('$');
+
+                // For string arrays, the last parameter is string length, not a dimension
+                const declaredDimensions = isStringArray ? Math.max(0, dimensionCount - 1) : dimensionCount;
+
+                // Check if declared dimensions exceeds ZX BASIC limit
+                if (declaredDimensions > 3) {
+                  diagnostics.push({
+                    severity: DiagnosticSeverity.Error,
+                    range: {
+                      start: { line: idToken.line, character: idToken.start },
+                      end: { line: idToken.line, character: i }
+                    },
+                    message: `Array '${arrayName}' declares ${declaredDimensions} dimension(s), but ZX BASIC maximum is 3`,
+                    source: 'zx-basic-lsp'
+                  });
+                }
+
+                // Store the declaration (use base name without $/%)
+                if (!dimDeclarations.has(arrayName)) {
+                  dimDeclarations.set(arrayName, { line: idToken.line, dimensions: declaredDimensions, isString: isStringArray });
+                }
           }
         } else {
           i++;
@@ -749,14 +780,18 @@ async function validateTextDocument(textDocument: TextDocument): Promise<Diagnos
     } else {
       // Check dimension count
       usages.forEach(usage => {
-        if (usage.usedDimensions !== declaration.dimensions) {
+        // For string arrays, the declaration.dimensions excludes the trailing length parameter
+        const declaredDims = declaration.dimensions;
+
+        if (usage.usedDimensions !== declaredDims) {
+          const suffix = declaration.isString ? ' (string length parameter ignored in declaration)' : '';
           diagnostics.push({
             severity: DiagnosticSeverity.Warning,
             range: {
               start: { line: usage.line, character: 0 },
               end: { line: usage.line, character: arrayName.length }
             },
-            message: `Array '${arrayName}' declared with ${declaration.dimensions} dimension(s) but used with ${usage.usedDimensions}`,
+            message: `Array '${arrayName}' declared with ${declaredDims} dimension(s) but used with ${usage.usedDimensions}${suffix}`,
             source: 'zx-basic-lsp'
           });
         }
@@ -2923,6 +2958,32 @@ connection.languages.semanticTokens.on(async (params: SemanticTokensParams): Pro
   
   // First pass: collect defined items
   for (const token of tokens) {
+    // Handle numeric literals as well (line numbers or numeric literals)
+    if (token.type === TokenType.NUMBER) {
+      // Decide classification: if at line start -> lineNumber; if preceded by GOTO/GOSUB etc -> gotoTarget; else numeric
+      const tokenIdx = tokens.indexOf(token);
+      let tokenType = 3; // numericVariable (fallback)
+      let modifier = 0;
+
+      // If token is the first significant token on its line treat as lineNumber
+      const hasEarlierOnLine = tokens.some(t2 => t2.line === token.line && t2.start < token.start && t2.type !== TokenType.EOF);
+      if (!hasEarlierOnLine) {
+        tokenType = SEMANTIC.LINE_NUMBER; // lineNumber
+        modifier = 1 << SEMANTIC_MOD.DEFINITION; // definition
+      } else if (tokenIdx > 0) {
+        const prev = tokens[tokenIdx - 1];
+        if (prev && prev.line === token.line && prev.type === TokenType.KEYWORD && ['GOTO', 'GOSUB', 'RUN', 'LIST', 'RESTORE'].includes(prev.value)) {
+          tokenType = SEMANTIC.GOTO_TARGET; // gotoTarget
+        }
+      }
+
+      const deltaLine = token.line - lastLine;
+      const deltaChar = deltaLine === 0 ? token.start - lastChar : token.start;
+      data.push(deltaLine, deltaChar, token.value.length, tokenType, modifier);
+      lastLine = token.line;
+      lastChar = token.start + token.value.length;
+      continue;
+    }
     if (token.type === TokenType.LINE_NUMBER) {
       definedLineNumbers.add(token.value);
     } else if (token.type === TokenType.KEYWORD && token.value.toUpperCase() === 'LET') {
@@ -2963,7 +3024,7 @@ connection.languages.semanticTokens.on(async (params: SemanticTokensParams): Pro
       const deltaLine = token.line - lastLine;
       const deltaChar = deltaLine === 0 ? token.start - lastChar : token.start;
       
-      data.push(deltaLine, deltaChar, token.value.length, 0, 1); // tokenType=0 (lineNumber), modifier=1 (definition)
+      data.push(deltaLine, deltaChar, token.value.length, SEMANTIC.LINE_NUMBER, 1 << SEMANTIC_MOD.DEFINITION); // lineNumber, definition
       lastLine = token.line;
       lastChar = token.start + token.value.length;
     } else if (token.type === TokenType.IDENTIFIER) {
@@ -2973,22 +3034,20 @@ connection.languages.semanticTokens.on(async (params: SemanticTokensParams): Pro
 
       // Determine variable type and modifiers
       if (token.value.endsWith('$')) {
-        tokenType = 2; // stringVariable
+        tokenType = SEMANTIC.STRING_VARIABLE; // stringVariable
       } else if (token.value.endsWith('%')) {
-        tokenType = 3; // numericVariable
+        tokenType = SEMANTIC.NUMERIC_VARIABLE; // numericVariable
       }
 
       // Check if it's an array (next token is parenthesis)
       const tokenIdx = tokens.indexOf(token);
       if (tokenIdx + 1 < tokens.length && tokens[tokenIdx + 1].value === '(') {
-        tokenType = 4; // array
+        tokenType = SEMANTIC.ARRAY; // array
       }
 
       // Check if it's defined or undefined
-      if (definedVariables.has(varName)) {
-        // Keep default modifier for defined variables
-      } else {
-        tokenType = 8; // undefined
+      if (!definedVariables.has(varName)) {
+        tokenType = SEMANTIC.UNDEFINED; // undefined
       }
 
       const deltaLine = token.line - lastLine;
@@ -2998,7 +3057,7 @@ connection.languages.semanticTokens.on(async (params: SemanticTokensParams): Pro
       lastLine = token.line;
       lastChar = token.start + token.value.length;
     } else if (token.type === TokenType.KEYWORD) {
-      const tokenType = 6; // keyword
+      const tokenType = SEMANTIC.KEYWORD; // keyword
       const modifier = 0;
 
       const deltaLine = token.line - lastLine;
@@ -3008,7 +3067,7 @@ connection.languages.semanticTokens.on(async (params: SemanticTokensParams): Pro
       lastLine = token.line;
       lastChar = token.start + token.value.length;
     } else if (token.type === TokenType.COMMENT) {
-      const tokenType = 9; // comment
+      const tokenType = SEMANTIC.COMMENT; // comment
       const modifier = 0;
 
       const deltaLine = token.line - lastLine;
@@ -3085,11 +3144,34 @@ connection.languages.semanticTokens.onRange(async (params: SemanticTokensRangePa
       continue;
     }
 
+    // Handle numeric literals in range as well
+    if (token.type === TokenType.NUMBER) {
+      const tokenIdx = tokens.indexOf(token);
+      let tokenType = 3; // numericVariable
+      let modifier = 0;
+
+      const hasEarlierOnLine = tokens.some(t2 => t2.line === token.line && t2.start < token.start && t2.type !== TokenType.EOF);
+      if (!hasEarlierOnLine) {
+        tokenType = SEMANTIC.LINE_NUMBER; modifier = 1 << SEMANTIC_MOD.DEFINITION;
+      } else if (tokenIdx > 0) {
+        const prev = tokens[tokenIdx - 1];
+        if (prev && prev.line === token.line && prev.type === TokenType.KEYWORD && ['GOTO', 'GOSUB', 'RUN', 'LIST', 'RESTORE'].includes(prev.value)) {
+          tokenType = SEMANTIC.GOTO_TARGET;
+        }
+      }
+
+      const deltaLine = token.line - lastLine;
+      const deltaChar = deltaLine === 0 ? token.start - lastChar : token.start;
+      data.push(deltaLine, deltaChar, token.value.length, tokenType, modifier);
+      lastLine = token.line;
+      lastChar = token.start + token.value.length;
+      continue;
+    }
     if (token.type === TokenType.LINE_NUMBER) {
       const deltaLine = token.line - lastLine;
       const deltaChar = deltaLine === 0 ? token.start - lastChar : token.start;
       
-      data.push(deltaLine, deltaChar, token.value.length, 0, 1);
+      data.push(deltaLine, deltaChar, token.value.length, SEMANTIC.LINE_NUMBER, 1 << SEMANTIC_MOD.DEFINITION);
       lastLine = token.line;
       lastChar = token.start + token.value.length;
     } else if (token.type === TokenType.IDENTIFIER) {
@@ -3098,18 +3180,18 @@ connection.languages.semanticTokens.onRange(async (params: SemanticTokensRangePa
       let modifier = 0;
 
       if (token.value.endsWith('$')) {
-        tokenType = 2; // stringVariable
+        tokenType = SEMANTIC.STRING_VARIABLE; // stringVariable
       } else if (token.value.endsWith('%')) {
-        tokenType = 3; // numericVariable
+        tokenType = SEMANTIC.NUMERIC_VARIABLE; // numericVariable
       }
 
       const tokenIdx = tokens.indexOf(token);
       if (tokenIdx + 1 < tokens.length && tokens[tokenIdx + 1].value === '(') {
-        tokenType = 4; // array
+        tokenType = SEMANTIC.ARRAY; // array
       }
 
       if (!definedVariables.has(varName)) {
-        tokenType = 8; // undefined
+        tokenType = SEMANTIC.UNDEFINED; // undefined
       }
 
       const deltaLine = token.line - lastLine;
@@ -3119,7 +3201,7 @@ connection.languages.semanticTokens.onRange(async (params: SemanticTokensRangePa
       lastLine = token.line;
       lastChar = token.start + token.value.length;
     } else if (token.type === TokenType.KEYWORD) {
-      const tokenType = 6; // keyword
+    const tokenType = SEMANTIC.KEYWORD; // keyword
       const modifier = 0;
 
       const deltaLine = token.line - lastLine;
@@ -3129,7 +3211,7 @@ connection.languages.semanticTokens.onRange(async (params: SemanticTokensRangePa
       lastLine = token.line;
       lastChar = token.start + token.value.length;
     } else if (token.type === TokenType.COMMENT) {
-      const tokenType = 9; // comment
+      const tokenType = SEMANTIC.COMMENT; // comment
       const modifier = 0;
 
       const deltaLine = token.line - lastLine;

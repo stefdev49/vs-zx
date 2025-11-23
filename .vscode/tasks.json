@@ -25,6 +25,42 @@
         "focus": false,
         "panel": "shared"
       }
+    },
+    {
+      "label": "install-vsix",
+      "type": "shell",
+      "command": "npm run package",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "install-latest-vsix",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "LATEST=$(ls -t vscode-extension/*.vsix | head -n1) && if [ -n \"$LATEST\" ]; then code --install-extension \"$LATEST\" --force; else echo 'No vsix found'; fi"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "build-and-install-vsix",
+      "dependsOn": ["install-vsix", "install-latest-vsix"],
+      "dependsOrder": "sequence",
+      "type": "shell",
+      "command": "echo vsix installed",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
     }
   ]
 }
