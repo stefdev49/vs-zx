@@ -58,10 +58,10 @@ program
       
       switch (format) {
         case 'raw':
-          outputBuffer = convertToRaw(basicText);
+          outputBuffer = await convertToRaw(basicText);
           break;
         case 'tap':
-          outputBuffer = convertToTap(basicText, metadata);
+          outputBuffer = await convertToTap(basicText, metadata);
           break;
         default:
           console.error(`Error: Unknown format '${format}'. Use 'raw' or 'tap'.`);
