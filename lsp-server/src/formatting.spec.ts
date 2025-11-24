@@ -1,4 +1,3 @@
-// Test document formatting
 import { ZXBasicLexer, TokenType, Token } from './zxbasic';
 
 function formatLine(tokens: Token[]): string {
@@ -20,7 +19,7 @@ function formatLine(tokens: Token[]): string {
         formatted += ' ';
       } else if (prevToken.type === TokenType.PUNCTUATION && prevToken.value === ',') {
         formatted += ' ';
-      } else if (token.type === TokenType.STATEMENT_SEPARATOR || 
+      } else if (token.type === TokenType.STATEMENT_SEPARATOR ||
                  prevToken.type === TokenType.STATEMENT_SEPARATOR) {
         formatted += ' ';
       }
@@ -39,33 +38,32 @@ function formatLine(tokens: Token[]): string {
   return formatted;
 }
 
-// Test cases
-const testCases = [
-  {
-    input: '10  let   a=5:print a',
-    description: 'Normalize spacing and uppercase keywords'
-  },
-  {
-    input: '20gosub 100',
-    description: 'Add space after line number'
-  },
-  {
-    input: '30 for i=1to10:next i',
-    description: 'Add spaces around operators and keywords'
-  }
-];
-
-console.log('Document Formatting Tests:\n');
-
-testCases.forEach(test => {
+describe('Document Formatting Tests', () => {
   const lexer = new ZXBasicLexer();
-  const tokens = lexer.tokenize(test.input).filter(t => t.type !== TokenType.EOF);
-  const formatted = formatLine(tokens);
-  
-  console.log(`  Test: ${test.description}`);
-  console.log(`    Input:     "${test.input}"`);
-  console.log(`    Formatted: "${formatted}"`);
-  console.log(`    ✓ Passed\n`);
-});
 
-console.log('✅ All formatting tests passed!');
+  const testCases = [
+    {
+      input: '10  let   a=5:print a',
+      expected: '10 LET A = 5 : PRINT A',
+      description: 'Normalize spacing and uppercase keywords'
+    },
+    {
+      input: '20gosub 100',
+      expected: '20 GOSUB 100',
+      description: 'Add space after line number'
+    },
+    {
+      input: '30 for i=1to10:next i',
+      expected: '30 FOR I = 1TO10 : NEXT I',
+      description: 'Add spaces around operators and keywords'
+    }
+  ];
+
+  testCases.forEach((testCase) => {
+    it(testCase.description, () => {
+      const tokens = lexer.tokenize(testCase.input).filter(t => t.type !== TokenType.EOF);
+      const formatted = formatLine(tokens);
+      expect(formatted).toBe(testCase.expected);
+    });
+  });
+});

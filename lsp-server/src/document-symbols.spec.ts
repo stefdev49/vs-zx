@@ -12,8 +12,8 @@ describe('Document Symbols Enhancement - Phase 3.1', () => {
     
     const tokens = lexer.tokenize(code);
     
-    // Find DEF FN tokens
-    const defFnTokens = tokens.filter(t => t.type === TokenType.KEYWORD && t.value.toUpperCase() === 'DEF FN');
+    // Find DEF FN tokens (normalized to DEFFN)
+    const defFnTokens = tokens.filter(t => t.type === TokenType.KEYWORD && t.value.toUpperCase() === 'DEFFN');
     expect(defFnTokens.length).toBe(2);
     
     // Each should be followed by an identifier
@@ -74,8 +74,8 @@ describe('Document Symbols Enhancement - Phase 3.1', () => {
     const code = '10 DEF FN MAX(A, B) = (A > B) * A + (B >= A) * B\n20 PRINT FN MAX(10, 20)';
     
     const tokens = lexer.tokenize(code);
-    const defFnTokens = tokens.filter(t => t.type === TokenType.KEYWORD && t.value.toUpperCase() === 'DEF FN');
-    
+    const defFnTokens = tokens.filter(t => t.type === TokenType.KEYWORD && t.value.toUpperCase() === 'DEFFN');
+
     expect(defFnTokens.length).toBe(1);
     
     // Next token should be the function name

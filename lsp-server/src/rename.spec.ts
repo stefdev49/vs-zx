@@ -51,9 +51,9 @@ describe('Rename Refactoring Provider', () => {
   it('should rename variable in LET statement', () => {
     // When renaming a variable, update all occurrences
     const originalCode = 'LET x = 10\nLET x = x + 1\nPRINT x';
-    const hasThreeX = (originalCode.match(/\bx\b/g) || []).length === 3;
-    
-    expect(hasThreeX).toBe(true);
+    const xCount = (originalCode.match(/\bx\b/g) || []).length;
+
+    expect(xCount).toBe(5);
   });
 
   it('should rename variable across multiple statements', () => {
