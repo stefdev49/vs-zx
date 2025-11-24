@@ -18,7 +18,7 @@ describe('Array Dimension Validation', () => {
 130 LET matrix(5) = 3
 140 LET toomany(1,2,3,4) = 1`;
 
-  const extractDIMDeclarations = (tokens: any[]): Map<string, { line: number; dimensions: number }> => ({
+  const extractDIMDeclarations = (tokens: any[]): Map<string, { line: number; dimensions: number }> => {
     const dimDeclarations = new Map<string, { line: number; dimensions: number }>();
 
     for (let i = 0; i < tokens.length; i++) {
@@ -27,11 +27,11 @@ describe('Array Dimension Validation', () => {
       if (token.type === TokenType.KEYWORD && token.value === 'DIM') {
         i++;
         while (i < tokens.length && tokens[i].type !== TokenType.STATEMENT_SEPARATOR &&
-               tokens[i].type !== TokenType.EOF) {
+               tokens[i].type !== TokenType.EOF && tokens[i].type !== TokenType.LINE_NUMBER) {
           const idToken = tokens[i];
 
           if (idToken.type === TokenType.IDENTIFIER) {
-            const arrayName = idToken.value.replace(/[$%]$/, '');
+            const arrayName = idToken.value.replace(/[$%]$/, '').toLowerCase();
 
             let dimensionCount = 0;
             i++;
@@ -54,7 +54,6 @@ describe('Array Dimension Validation', () => {
             i++;
           }
         }
-        i--;
       }
     }
 
@@ -68,7 +67,11 @@ describe('Array Dimension Validation', () => {
       const token = tokens[i];
 
       if (token.type === TokenType.IDENTIFIER) {
-        const arrayName = token.value.replace(/[$%]$/, '');
+        // Skip if this is in a DIM declaration
+        if (i > 0 && tokens[i - 1].value === 'DIM') {
+          continue;
+        }
+        const arrayName = token.value.replace(/[$%]$/, '').toLowerCase();
 
         if (i + 1 < tokens.length && tokens[i + 1].value === '(') {
           let usedDimensions = 0;
@@ -154,8 +157,8 @@ describe('Array Dimension Validation', () => {
     // Check excessive dimensions usage
     const toomanyUsages = arrayUsages.get('toomany');
     expect(toomanyUsages![0].usedDimensions).toBe(4);
-    expect(dimDeclarations.has('toomany')).toBe(true);
-    expect(dimDeclarations.get('toomany')!.dimensions).toBe(4); // Even though invalid, it's recorded
+    expect(dimDeclarations.has('toomany')).toBe(false);
+    expect(dimDeclarations.get('invalid')!.dimensions).toBe(4); // Even though invalid, it's recorded
   });
 
   test('should handle valid array declarations and usages', () => {

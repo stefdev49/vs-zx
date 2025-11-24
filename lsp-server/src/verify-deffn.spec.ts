@@ -7,7 +7,7 @@ describe('Verify DEF FN handling in deffn-demo.bas', () => {
 
   const lines = content.split('\n').filter(line => line.trim());
 
-  const deffnLines = lines.filter(line => line.includes('DEF FN') || line.includes('DEFFN'));
+  const deffnLines = lines.filter(line => (line.includes('DEF FN') || line.includes('DEFFN')) && !line.trim().match(/^\d+\s+REM/));
 
   test('all DEF FN occurrences are properly normalized to DEFFN', () => {
     deffnLines.forEach((line, index) => {

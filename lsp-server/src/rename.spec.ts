@@ -53,7 +53,7 @@ describe('Rename Refactoring Provider', () => {
     const originalCode = 'LET x = 10\nLET x = x + 1\nPRINT x';
     const xCount = (originalCode.match(/\bx\b/g) || []).length;
 
-    expect(xCount).toBe(5);
+    expect(xCount).toBe(4);
   });
 
   it('should rename variable across multiple statements', () => {

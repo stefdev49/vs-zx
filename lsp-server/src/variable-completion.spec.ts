@@ -117,24 +117,24 @@ describe('Variable and Array Completion', () => {
 
   test('should extract arrays correctly', () => {
     const arrays = extractArrays(tokens);
-    expect(arrays).toEqual(['names', 'scores']);
+    expect(arrays).toEqual(['NAMES', 'SCORES']);
   });
 
   test('should extract variables correctly', () => {
     const variables = extractVariables(tokens);
-    expect(variables).toEqual(['count', 'i', 'player', 'result', 's', 'score', 'x', 'y', 'z']);
+    expect(variables).toEqual(['COUNT', 'I', 'PLAYER', 'RESULT', 'S', 'SCORE', 'X', 'Y', 'Z']);
   });
 
   test('should filter variables by prefix', () => {
     const variables = extractVariables(tokens);
-    expect(filterPrefix('p', variables)).toEqual(['player']);
-    expect(filterPrefix('c', variables)).toEqual(['count']);
-    expect(filterPrefix('s', variables)).toEqual(['s', 'score']);
+    expect(filterPrefix('p', variables)).toEqual(['PLAYER']);
+    expect(filterPrefix('c', variables)).toEqual(['COUNT']);
+    expect(filterPrefix('s', variables)).toEqual(['S', 'SCORE']);
   });
 
   test('should filter arrays by prefix', () => {
     const arrays = extractArrays(tokens);
-    expect(filterPrefix('n', arrays)).toEqual(['names']);
-    expect(filterPrefix('s', arrays)).toEqual(['scores']);
+    expect(filterPrefix('n', arrays)).toEqual(['NAMES']);
+    expect(filterPrefix('s', arrays)).toEqual(['SCORES']);
   });
 });

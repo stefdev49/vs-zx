@@ -74,9 +74,9 @@ describe('Undeclared Array Detection - Phase 3.3', () => {
     for (let i = 0; i < tokens.length; i++) {
       if (tokens[i].type === TokenType.KEYWORD && tokens[i].value.toUpperCase() === 'DIM') {
         i++;
-        while (i < tokens.length && tokens[i].type !== 'STATEMENT_SEPARATOR' && tokens[i].type !== 'EOF') {
-          if (tokens[i].type === TokenType.IDENTIFIER && 
-              i + 1 < tokens.length && 
+        while (i < tokens.length && tokens[i].type !== TokenType.STATEMENT_SEPARATOR && tokens[i].type !== TokenType.EOF && tokens[i].type !== TokenType.LINE_NUMBER) {
+          if (tokens[i].type === TokenType.IDENTIFIER &&
+              i + 1 < tokens.length &&
               tokens[i + 1].value === '(') {
             declaredArrays.add(tokens[i].value);
           }
@@ -99,9 +99,9 @@ describe('Undeclared Array Detection - Phase 3.3', () => {
     for (let i = 0; i < tokens.length; i++) {
       if (tokens[i].type === TokenType.KEYWORD && tokens[i].value.toUpperCase() === 'DIM') {
         i++;
-        while (i < tokens.length && tokens[i].type !== 'STATEMENT_SEPARATOR' && tokens[i].type !== 'EOF') {
-          if (tokens[i].type === TokenType.IDENTIFIER && 
-              i + 1 < tokens.length && 
+        while (i < tokens.length && tokens[i].type !== TokenType.STATEMENT_SEPARATOR && tokens[i].type !== TokenType.EOF && tokens[i].type !== TokenType.LINE_NUMBER) {
+          if (tokens[i].type === TokenType.IDENTIFIER &&
+              i + 1 < tokens.length &&
               tokens[i + 1].value === '(') {
             const arrayName = tokens[i].value.replace(/[$%]$/, '');
             declaredArrays.add(arrayName);
@@ -124,9 +124,9 @@ describe('Undeclared Array Detection - Phase 3.3', () => {
     for (let i = 0; i < tokens.length; i++) {
       if (tokens[i].type === TokenType.KEYWORD && tokens[i].value.toUpperCase() === 'DIM') {
         i++;
-        while (i < tokens.length && tokens[i].type !== 'STATEMENT_SEPARATOR' && tokens[i].type !== 'EOF') {
-          if (tokens[i].type === TokenType.IDENTIFIER && 
-              i + 1 < tokens.length && 
+        while (i < tokens.length && tokens[i].type !== TokenType.STATEMENT_SEPARATOR && tokens[i].type !== TokenType.EOF && tokens[i].type !== TokenType.LINE_NUMBER) {
+          if (tokens[i].type === TokenType.IDENTIFIER &&
+              i + 1 < tokens.length &&
               tokens[i + 1].value === '(') {
             declaredArrays.add(tokens[i].value.toUpperCase());
           }
@@ -176,8 +176,7 @@ describe('Undeclared Array Detection - Phase 3.3', () => {
     // SIN( looks like array usage but it's a function
     let foundSin = false;
     for (let i = 0; i < tokens.length; i++) {
-      if (tokens[i].type === TokenType.IDENTIFIER && 
-          tokens[i].value.toUpperCase() === 'SIN' && 
+      if (tokens[i].value.toUpperCase() === 'SIN' &&
           i + 1 < tokens.length && 
           tokens[i + 1].value === '(') {
         foundSin = true;

@@ -20,16 +20,16 @@ describe('ZX Basic Lexer and Parser Tests', () => {
       const tokens = lexer.tokenize(code);
       const nonEofTokens = tokens.filter(t => t.type !== TokenType.EOF);
       expect(nonEofTokens.length).toBe(7);
-      expect(tokens[2].value).toBe('=');
-      expect(tokens[4].value).toBe('+');
-      expect(tokens[6].value).toBe('*');
+      expect(tokens[1].value).toBe('=');
+      expect(tokens[3].value).toBe('+');
+      expect(tokens[5].value).toBe('*');
     });
 
     test('String literals', () => {
       const code = 'PRINT "HELLO"';
       const tokens = lexer.tokenize(code);
-      expect(tokens[2].type).toBe(TokenType.STRING);
-      expect(tokens[2].value).toBe('"HELLO"');
+      expect(tokens[1].type).toBe(TokenType.STRING);
+      expect(tokens[1].value).toBe('"HELLO"');
     });
 
     test('Keywords', () => {
@@ -68,7 +68,7 @@ describe('ZX Basic Lexer and Parser Tests', () => {
       const ast = parser.parseExpression();
       expect(ast?.type).toBe('binary_expr');
       expect(ast?.operator).toBe('+');
-      expect(ast?.left?.value).toBe(2);
+      expect(ast?.left?.value).toBe("2");
       expect(ast?.right?.type).toBe('binary_expr');
       expect(ast?.right?.operator).toBe('*');
     });

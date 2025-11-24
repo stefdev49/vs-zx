@@ -27,7 +27,7 @@ describe('Type Checking Diagnostics', () => {
       if (token.type === TokenType.KEYWORD && token.value === 'LET' && i + 1 < tokens.length) {
         const varToken = tokens[i + 1];
         if (varToken.type === TokenType.IDENTIFIER) {
-          const varName = varToken.value.replace(/[$%]$/, '');
+          const varName = varToken.value.replace(/[$%]$/, '').toLowerCase();
           if (varToken.value.endsWith('$')) {
             variableTypes.set(varName, 'string');
           } else if (varToken.value.endsWith('%')) {
@@ -43,7 +43,7 @@ describe('Type Checking Diagnostics', () => {
         i++;
         while (i < tokens.length && tokens[i].type !== TokenType.STATEMENT_SEPARATOR && tokens[i].type !== TokenType.EOF) {
           if (tokens[i].type === TokenType.IDENTIFIER) {
-            const varName = tokens[i].value.replace(/[$%]$/, '');
+            const varName = tokens[i].value.replace(/[$%]$/, '').toLowerCase();
             if (tokens[i].value.endsWith('$')) {
               variableTypes.set(varName, 'string');
             } else {
@@ -59,7 +59,7 @@ describe('Type Checking Diagnostics', () => {
       if (token.type === TokenType.KEYWORD && token.value === 'FOR' && i + 1 < tokens.length) {
         const varToken = tokens[i + 1];
         if (varToken.type === TokenType.IDENTIFIER) {
-          const varName = varToken.value.replace(/[$%]$/, '');
+          const varName = varToken.value.replace(/[$%]$/, '').toLowerCase();
           variableTypes.set(varName, 'numeric');
         }
       }
@@ -78,7 +78,7 @@ describe('Type Checking Diagnostics', () => {
       if (token.type === TokenType.KEYWORD && numericFunctions.includes(token.value) &&
           i + 1 < tokens.length && tokens[i + 1].value === '(') {
         if (i + 2 < tokens.length && tokens[i + 2].type === TokenType.IDENTIFIER) {
-          const varName = tokens[i + 2].value.replace(/[$%]$/, '');
+          const varName = tokens[i + 2].value.replace(/[$%]$/, '').toLowerCase();
           const varType = variableTypes.get(varName);
 
           if (varType === 'string') {

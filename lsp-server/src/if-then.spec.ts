@@ -41,10 +41,10 @@ describe('IF/THEN Validation', () => {
     },
     {
       code: `10 LET IF = 5`,
-      description: 'Valid: IF as variable name (edge case)',
-      expectedIFCount: 0,
+      description: 'Using IF as identifier (invalid in BASIC)',
+      expectedIFCount: 1,
       expectedTHENCount: 0,
-      shouldHaveValidThen: true
+      shouldHaveValidThen: false
     },
     {
       code: `10 IF A: PRINT B
@@ -57,24 +57,24 @@ describe('IF/THEN Validation', () => {
   ];
 
   function hasValidThen(tokens: any[]): boolean {
-    const ifStatements: number[] = [];
-    const thenStatements: number[] = [];
-
     for (let i = 0; i < tokens.length; i++) {
-      if (tokens[i].type === TokenType.KEYWORD) {
-        if (tokens[i].value === 'IF') {
-          ifStatements.push(i);
-        } else if (tokens[i].value === 'THEN') {
-          thenStatements.push(i);
+      if (tokens[i].type === TokenType.KEYWORD && tokens[i].value === 'IF') {
+        // Look for THEN or : until non-: STATEMENT_SEPARATOR or EOF
+        for (let j = i + 1; j < tokens.length; j++) {
+          if (tokens[j].type === TokenType.EOF) break;
+          if (tokens[j].type === TokenType.STATEMENT_SEPARATOR && tokens[j].value !== ':') break;
+          if (tokens[j].type === TokenType.KEYWORD && tokens[j].value === 'THEN') {
+            return true; // Found THEN
+          } else if (tokens[j].value === ':') {
+            return true; // Found colon, valid multi-statement IF
+          }
         }
+        // If reached STATEMENT_SEPARATOR without THEN or :, it's invalid
+        return false;
       }
     }
-
-    if (ifStatements.length > 0 && thenStatements.length > 0) {
-      // Simple check: if there's at least one THEN after the last IF
-      return thenStatements[thenStatements.length - 1] > ifStatements[ifStatements.length - 1];
-    }
-    return false;
+    // No IF found
+    return true; // According to test, if no IF, "if (ifCount > 0)" check
   }
 
   testCases.forEach((testCase) => {

@@ -8,7 +8,7 @@ export enum TokenType {
   PUNCTUATION = 'PUNCTUATION',
   COMMENT = 'COMMENT',
 
-  // Keywords
+  // Keywords (will be lexed as KEYWORD with specific value)
   LET = 'LET',
   IF = 'IF',
   THEN = 'THEN',
@@ -561,9 +561,9 @@ export class ZXBasicParser {
   private parseLet(): ASTNode {
     this.consume(TokenType.KEYWORD); // LET
     const variable = this.consume(TokenType.IDENTIFIER);
-    this.consume(TokenType.EQUALS);
+    this.consumeOperator('=');
     const expression = this.expression();
-    
+
     return {
       type: 'let_statement',
       variable: variable.value,
@@ -634,17 +634,17 @@ export class ZXBasicParser {
   private parseFor(): ASTNode {
     this.consume(TokenType.KEYWORD); // FOR
     const variable = this.consume(TokenType.IDENTIFIER).value;
-    this.consume(TokenType.EQUALS);
+    this.consumeOperator('=');
     const start = this.expression();
     this.consume(TokenType.KEYWORD); // TO
     const end = this.expression();
-    
+
     let step = null;
     if (this.peek().type === TokenType.KEYWORD && this.peek().value === 'STEP') {
       this.consume(TokenType.KEYWORD); // STEP
       step = this.expression();
     }
-    
+
     return {
       type: 'for_statement',
       variable,
@@ -657,36 +657,36 @@ export class ZXBasicParser {
   private parseDim(): ASTNode {
     this.consume(TokenType.KEYWORD); // DIM
     const arrays: Array<{ name: string; dimensions: ASTNode[] }> = [];
-    
+
     while (!this.isAtEnd() && this.peek().type !== TokenType.STATEMENT_SEPARATOR) {
       const name = this.consume(TokenType.IDENTIFIER).value;
       const dimensions: ASTNode[] = [];
-      
+
       if (this.peek().value === '(') {
-        this.consume(TokenType.LPAREN);
-        
+        this.consumePunctuation('(');
+
         while (this.peek().value !== ')') {
           dimensions.push(this.expression());
-          
+
           if (this.peek().value === ',') {
             this.advance();
           } else {
             break;
           }
         }
-        
-        this.consume(TokenType.RPAREN);
+
+        this.consumePunctuation(')');
       }
-      
+
       arrays.push({ name, dimensions });
-      
+
       if (this.peek().value === ',') {
         this.advance();
       } else {
         break;
       }
     }
-    
+
     return {
       type: 'dim_statement',
       arrays
@@ -695,8 +695,8 @@ export class ZXBasicParser {
 
   private parseGoto(): ASTNode {
     this.consume(TokenType.KEYWORD); // GOTO
-    const lineNumber = this.consume(TokenType.LINE_NUMBER).value;
-    
+    const lineNumber = this.consume(TokenType.NUMBER).value;
+
     return {
       type: 'goto_statement',
       lineNumber
@@ -705,8 +705,8 @@ export class ZXBasicParser {
 
   private parseGosub(): ASTNode {
     this.consume(TokenType.KEYWORD); // GOSUB
-    const lineNumber = this.consume(TokenType.LINE_NUMBER).value;
-    
+    const lineNumber = this.consume(TokenType.NUMBER).value;
+
     return {
       type: 'gosub_statement',
       lineNumber
@@ -986,10 +986,25 @@ export class ZXBasicParser {
     return this.tokens[this.current - 1];
   }
 
-  private consume(type: TokenType): Token {
-    if (this.check(type)) {
-      return this.advance();
+  private consume(type: TokenType, value?: string): Token {
+    if (value !== undefined) {
+      if (this.peek().type === type && this.peek().value === value) {
+        return this.advance();
+      }
+      throw new Error(`Expected ${type} with value ${value}`);
+    } else {
+      if (this.check(type)) {
+        return this.advance();
+      }
+      throw new Error(`Expected ${type}`);
     }
-    throw new Error(`Expected ${type}`);
+  }
+
+  private consumeOperator(value: string): Token {
+    return this.consume(TokenType.OPERATOR, value);
+  }
+
+  private consumePunctuation(value: string): Token {
+    return this.consume(TokenType.PUNCTUATION, value);
   }
 }
