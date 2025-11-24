@@ -646,7 +646,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<Diagnos
 
   // Check for array dimension validation (DIM declares vs usage)
   const dimDeclarations = new Map<string, { line: number; dimensions: number; isString: boolean }>();
-  const arrayUsages = new Map<string, Array<{ line: number; usedDimensions: number }>>();
+  const arrayUsages = new Map<string, Array<{ line: number; usedDimensions: number; isString: boolean }>>();
   
   // First pass: collect all DIM declarations
   for (let i = 0; i < tokens.length; i++) {
@@ -718,11 +718,13 @@ async function validateTextDocument(textDocument: TextDocument): Promise<Diagnos
     
     if (token.type === TokenType.IDENTIFIER) {
       const arrayName = token.value.replace(/[$%]$/, '');
+      const isStringVariable = token.value.endsWith('$');
       
-      // Check if followed by parentheses (array usage)
+      // Check if followed by parentheses (array usage or string slicing)
       if (i + 1 < tokens.length && tokens[i + 1].value === '(') {
-        // Count dimensions in this usage
+        // Count dimensions in this usage and detect TO keyword for string slicing
         let usedDimensions = 0;
+        let hasToKeyword = false;
         let j = i + 2;
         let depth = 1;
         
@@ -733,10 +735,18 @@ async function validateTextDocument(textDocument: TextDocument): Promise<Diagnos
             depth--;
           } else if (tokens[j].value === ',' && depth === 1) {
             usedDimensions++;
+          } else if (depth === 1 && tokens[j].type === TokenType.KEYWORD && tokens[j].value.toUpperCase() === 'TO') {
+            hasToKeyword = true;
           }
           j++;
         }
-        usedDimensions++; // At least one dimension
+        usedDimensions++; // At least one dimension/parameter
+        
+        // If TO keyword is present, this is string slicing, not array access
+        if (hasToKeyword) {
+          // String slicing syntax like a$(TO 10) or a$(5 TO 10) - don't validate as array
+          continue;
+        }
         
         // Check if usage exceeds ZX BASIC limit
         if (usedDimensions > 3) {
@@ -755,7 +765,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<Diagnos
         if (!arrayUsages.has(arrayName)) {
           arrayUsages.set(arrayName, []);
         }
-        arrayUsages.get(arrayName)!.push({ line: token.line, usedDimensions });
+        arrayUsages.get(arrayName)!.push({ line: token.line, usedDimensions, isString: isStringVariable });
       }
     }
   }
@@ -782,16 +792,29 @@ async function validateTextDocument(textDocument: TextDocument): Promise<Diagnos
       usages.forEach(usage => {
         // For string arrays, the declaration.dimensions excludes the trailing length parameter
         const declaredDims = declaration.dimensions;
+        const usedDims = usage.usedDimensions;
 
-        if (usage.usedDimensions !== declaredDims) {
-          const suffix = declaration.isString ? ' (string length parameter ignored in declaration)' : '';
+        // Special case: String arrays can have one extra parameter for character position access
+        // e.g., DIM a$(10,20) declares 1D array, a$(5,10) accesses element 5, character 10
+        const isValidStringSlicing = declaration.isString && usage.isString && usedDims === declaredDims + 1;
+
+        if (usedDims !== declaredDims && !isValidStringSlicing) {
+          let message = `Array '${arrayName}' declared with ${declaredDims} dimension(s) but used with ${usedDims}`;
+          
+          if (declaration.isString && usedDims === declaredDims + 1) {
+            // This shouldn't happen due to isValidStringSlicing check, but kept for safety
+            message += ' (extra parameter may be character position for string slicing)';
+          } else if (declaration.isString) {
+            message += ' (string length parameter not counted as dimension)';
+          }
+          
           diagnostics.push({
             severity: DiagnosticSeverity.Warning,
             range: {
               start: { line: usage.line, character: 0 },
               end: { line: usage.line, character: arrayName.length }
             },
-            message: `Array '${arrayName}' declared with ${declaredDims} dimension(s) but used with ${usage.usedDimensions}${suffix}`,
+            message: message,
             source: 'zx-basic-lsp'
           });
         }
@@ -1308,37 +1331,79 @@ connection.onHover((params: HoverParams): Hover => {
   }
 
   // Check if it's a line number (hover over GOTO/GOSUB target)
+  // Only show line info if preceded by GOTO, GOSUB, RUN, LIST, RESTORE, etc.
   if (/^\d+$/.test(word)) {
     const lineNum = word;
-    const lexer = new ZXBasicLexer();
-    const allTokens = lexer.tokenize(document.getText());
     
-    // Find the line content
-    let lineContent = '';
-    let foundLine = false;
-    for (let i = 0; i < allTokens.length; i++) {
-      if (allTokens[i].type === TokenType.LINE_NUMBER && allTokens[i].value === lineNum) {
-        foundLine = true;
-        // Collect tokens until end of line
-        i++;
-        while (i < allTokens.length && allTokens[i].type !== TokenType.EOF) {
-          if (allTokens[i].type === TokenType.STATEMENT_SEPARATOR && allTokens[i].value === ':') {
+    // Check if this number is preceded by a target keyword
+    const beforeWord = fullLineText.substring(0, startChar).trimEnd();
+    const isTargetNumber = /\b(GOTO|GO TO|GOSUB|GO SUB|RUN|LIST|RESTORE|THEN|ELSE)\s*$/.test(beforeWord);
+    
+    if (isTargetNumber) {
+      const lexer = new ZXBasicLexer();
+      const allTokens = lexer.tokenize(document.getText());
+      
+      // Find the line content using original source text
+      let foundLine = false;
+      let lineStartIdx = -1;
+      let lineEndIdx = -1;
+      
+      for (let i = 0; i < allTokens.length; i++) {
+        if (allTokens[i].type === TokenType.LINE_NUMBER && allTokens[i].value === lineNum) {
+          foundLine = true;
+          lineStartIdx = i;
+          
+          // Find the end of line (next line number or EOF)
+          i++;
+          while (i < allTokens.length) {
+            if (allTokens[i].type === TokenType.LINE_NUMBER || allTokens[i].type === TokenType.EOF) {
+              lineEndIdx = i;
+              break;
+            }
+            i++;
+          }
+          if (lineEndIdx === -1) {
+            lineEndIdx = allTokens.length;
+          }
+          break;
+        }
+      }
+      
+      // Extract text from original source using token positions
+      if (foundLine && lineStartIdx >= 0) {
+        const startToken = allTokens[lineStartIdx];
+        
+        // Find where this line ends - look for next line number or end of document
+        let endLine = startToken.line;
+        let endChar = 500; // Default to far end of line
+        
+        // Search for the next line number token on a different line
+        for (let j = lineStartIdx + 1; j < allTokens.length; j++) {
+          if (allTokens[j].type === TokenType.LINE_NUMBER && allTokens[j].line > startToken.line) {
+            endLine = allTokens[j].line;
+            endChar = 0; // Start of next line
             break;
           }
-          lineContent += allTokens[i].value;
-          i++;
+          if (allTokens[j].type === TokenType.EOF) {
+            endLine = allTokens[j].line;
+            endChar = allTokens[j].start;
+            break;
+          }
         }
-        break;
+        
+        // Get full line text from line number to end of line
+        const lineContent = document.getText({
+          start: { line: startToken.line, character: 0 },
+          end: { line: endLine, character: endChar }
+        });
+        
+        return {
+          contents: {
+            kind: 'markdown',
+            value: `**Line ${lineNum}**\n\`\`\`zx-basic\n${lineContent.trim()}\n\`\`\``
+          }
+        };
       }
-    }
-    
-    if (foundLine) {
-      return {
-        contents: {
-          kind: 'markdown',
-          value: `**Line ${lineNum}**\n\`\`\`\n${lineNum} ${lineContent.trim()}\n\`\`\``
-        }
-      };
     }
   }
 
@@ -2960,28 +3025,28 @@ connection.languages.semanticTokens.on(async (params: SemanticTokensParams): Pro
   for (const token of tokens) {
     // Handle numeric literals as well (line numbers or numeric literals)
     if (token.type === TokenType.NUMBER) {
-      // Decide classification: if at line start -> lineNumber; if preceded by GOTO/GOSUB etc -> gotoTarget; else numeric
+      // Decide classification: if at line start -> skip (let TextMate handle); if preceded by GOTO/GOSUB etc -> gotoTarget; else skip
       const tokenIdx = tokens.indexOf(token);
-      let tokenType = 3; // numericVariable (fallback)
-      let modifier = 0;
 
-      // If token is the first significant token on its line treat as lineNumber
+      // If token is the first significant token on its line, skip it (it's a line number, let TextMate handle it)
       const hasEarlierOnLine = tokens.some(t2 => t2.line === token.line && t2.start < token.start && t2.type !== TokenType.EOF);
       if (!hasEarlierOnLine) {
-        tokenType = SEMANTIC.LINE_NUMBER; // lineNumber
-        modifier = 1 << SEMANTIC_MOD.DEFINITION; // definition
-      } else if (tokenIdx > 0) {
+        // Skip line numbers - let TextMate grammar handle them
+        continue;
+      }
+      
+      // Check if it's a GOTO/GOSUB target
+      if (tokenIdx > 0) {
         const prev = tokens[tokenIdx - 1];
         if (prev && prev.line === token.line && prev.type === TokenType.KEYWORD && ['GOTO', 'GOSUB', 'RUN', 'LIST', 'RESTORE'].includes(prev.value)) {
-          tokenType = SEMANTIC.GOTO_TARGET; // gotoTarget
+          const tokenType = SEMANTIC.GOTO_TARGET; // gotoTarget
+          const deltaLine = token.line - lastLine;
+          const deltaChar = deltaLine === 0 ? token.start - lastChar : token.start;
+          data.push(deltaLine, deltaChar, token.value.length, tokenType, 0);
+          lastLine = token.line;
+          lastChar = token.start + token.value.length;
         }
       }
-
-      const deltaLine = token.line - lastLine;
-      const deltaChar = deltaLine === 0 ? token.start - lastChar : token.start;
-      data.push(deltaLine, deltaChar, token.value.length, tokenType, modifier);
-      lastLine = token.line;
-      lastChar = token.start + token.value.length;
       continue;
     }
     if (token.type === TokenType.LINE_NUMBER) {
@@ -3020,13 +3085,8 @@ connection.languages.semanticTokens.on(async (params: SemanticTokensParams): Pro
   // Generate semantic tokens
   for (const token of tokens) {
     if (token.type === TokenType.LINE_NUMBER) {
-      // Line number at start of line
-      const deltaLine = token.line - lastLine;
-      const deltaChar = deltaLine === 0 ? token.start - lastChar : token.start;
-      
-      data.push(deltaLine, deltaChar, token.value.length, SEMANTIC.LINE_NUMBER, 1 << SEMANTIC_MOD.DEFINITION); // lineNumber, definition
-      lastLine = token.line;
-      lastChar = token.start + token.value.length;
+      // Skip line numbers - let TextMate grammar handle them for consistent coloring
+      continue;
     } else if (token.type === TokenType.IDENTIFIER) {
       const varName = token.value.replace(/[$%]$/, '');
       let tokenType = 1; // variable (default)
@@ -3147,33 +3207,30 @@ connection.languages.semanticTokens.onRange(async (params: SemanticTokensRangePa
     // Handle numeric literals in range as well
     if (token.type === TokenType.NUMBER) {
       const tokenIdx = tokens.indexOf(token);
-      let tokenType = 3; // numericVariable
-      let modifier = 0;
 
       const hasEarlierOnLine = tokens.some(t2 => t2.line === token.line && t2.start < token.start && t2.type !== TokenType.EOF);
       if (!hasEarlierOnLine) {
-        tokenType = SEMANTIC.LINE_NUMBER; modifier = 1 << SEMANTIC_MOD.DEFINITION;
-      } else if (tokenIdx > 0) {
+        // Skip line numbers - let TextMate grammar handle them
+        continue;
+      }
+      
+      // Check if it's a GOTO/GOSUB target
+      if (tokenIdx > 0) {
         const prev = tokens[tokenIdx - 1];
         if (prev && prev.line === token.line && prev.type === TokenType.KEYWORD && ['GOTO', 'GOSUB', 'RUN', 'LIST', 'RESTORE'].includes(prev.value)) {
-          tokenType = SEMANTIC.GOTO_TARGET;
+          const tokenType = SEMANTIC.GOTO_TARGET;
+          const deltaLine = token.line - lastLine;
+          const deltaChar = deltaLine === 0 ? token.start - lastChar : token.start;
+          data.push(deltaLine, deltaChar, token.value.length, tokenType, 0);
+          lastLine = token.line;
+          lastChar = token.start + token.value.length;
         }
       }
-
-      const deltaLine = token.line - lastLine;
-      const deltaChar = deltaLine === 0 ? token.start - lastChar : token.start;
-      data.push(deltaLine, deltaChar, token.value.length, tokenType, modifier);
-      lastLine = token.line;
-      lastChar = token.start + token.value.length;
       continue;
     }
     if (token.type === TokenType.LINE_NUMBER) {
-      const deltaLine = token.line - lastLine;
-      const deltaChar = deltaLine === 0 ? token.start - lastChar : token.start;
-      
-      data.push(deltaLine, deltaChar, token.value.length, SEMANTIC.LINE_NUMBER, 1 << SEMANTIC_MOD.DEFINITION);
-      lastLine = token.line;
-      lastChar = token.start + token.value.length;
+      // Skip line numbers - let TextMate grammar handle them for consistent coloring
+      continue;
     } else if (token.type === TokenType.IDENTIFIER) {
       const varName = token.value.replace(/[$%]$/, '');
       let tokenType = 1; // variable (default)
