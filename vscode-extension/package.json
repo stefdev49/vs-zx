@@ -2,7 +2,7 @@
   "name": "zx-basic-vscode-extension",
   "repository": "git+https://github.com/stef/vs-zx.git",
   "displayName": "ZX BASIC Development Environment",
-  "version": "1.0.53",
+  "version": "1.0.55",
   "description": "VS Code extension for ZX Spectrum BASIC development with Interface 1 transfer",
   "license": "MIT",
   "engines": {
@@ -91,6 +91,16 @@
             "type": "boolean",
             "default": true,
             "description": "Auto-uppercase keywords on completion and formatting"
+          },
+          "zxBasic.trace.server": {
+            "type": "string",
+            "enum": [
+              "off",
+              "messages",
+              "verbose"
+            ],
+            "default": "off",
+            "description": "Trace the communication between VS Code and the language server"
           },
           "zx-basic.serialPort": {
             "type": "string",

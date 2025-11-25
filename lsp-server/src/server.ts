@@ -111,6 +111,10 @@ interface ExampleSettings {
   lineNumberIncrement: number;
   maxLineLength: number;
   uppercaseKeywords: boolean;
+  trace: { server: string };
+  logging: {
+    level: 'off' | 'error' | 'warn' | 'info' | 'debug';
+  };
 }
 
 // The global settings, used when the `workspace/configuration` request is not supported by the client.
@@ -120,7 +124,9 @@ const defaultSettings: ExampleSettings = {
   strictMode: false,
   lineNumberIncrement: 10,
   maxLineLength: 255,
-  uppercaseKeywords: true
+  uppercaseKeywords: true,
+  trace: { server: 'off' },
+  logging: { level: 'off' }
 };
 let globalSettings: ExampleSettings = defaultSettings;
 
@@ -194,9 +200,10 @@ function getDocumentSettings(resource: string): Thenable<ExampleSettings> {
       lineNumberIncrement: settings?.lineNumberIncrement ?? defaultSettings.lineNumberIncrement,
       maxLineLength: settings?.maxLineLength ?? defaultSettings.maxLineLength,
       uppercaseKeywords: settings?.uppercaseKeywords ?? defaultSettings.uppercaseKeywords,
+      trace: { server: settings?.trace?.server ?? defaultSettings.trace.server },
+      logging: { level: settings?.logging?.level ?? defaultSettings.logging.level }
     })));
-  }
-  return documentSettings.get(resource)!;
+  } return documentSettings.get(resource)!;
 }
 
 connection.onInitialize((params: InitializeParams) => {
@@ -3389,19 +3396,17 @@ connection.onRenameRequest(async (params: RenameParams): Promise<WorkspaceEdit |
 });
 
 // Folding ranges provider for FOR...NEXT, subroutines, and DATA blocks
-connection.onFoldingRanges((params: FoldingRangeParams): FoldingRange[] => {
-  const document = documents.get(params.textDocument.uri);
-  if (!document) {
-    return [];
-  }
-
-  const text = document.getText();
+export function getFoldingRanges(text: string, settings: ExampleSettings): FoldingRange[] {
   const lines = text.split('\n');
   const foldingRanges: FoldingRange[] = [];
 
+  if (settings.logging.level === 'debug') {
+    connection.console.log(`Folding ranges debug: Analyzing ${lines.length} lines of text`);
+  }
+
   // Track FOR loops
   const forStack: { keyword: string; startLine: number }[] = [];
-  
+
   // Track GOSUB subroutines
   const subroutines: { startLine: number; lineNumber: string }[] = [];
   const gosubTargets = new Set<string>();
@@ -3412,15 +3417,22 @@ connection.onFoldingRanges((params: FoldingRangeParams): FoldingRange[] => {
     const lineNumMatch = line.match(/^(\d+)\s+/);
     if (lineNumMatch) {
       const lineNum = lineNumMatch[1];
-      
+
       // Check for GOSUB/GO SUB calls
       if (/\b(GOSUB|GO\s+SUB)\s+(\d+)/i.test(line)) {
         const targetMatch = line.match(/\b(GOSUB|GO\s+SUB)\s+(\d+)/i);
         if (targetMatch) {
           gosubTargets.add(targetMatch[2]);
+          if (settings.logging.level === 'debug') {
+            connection.console.log(`Folding ranges debug: Found GOSUB target line ${targetMatch[2]} on line ${i}`);
+          }
         }
       }
     }
+  }
+
+  if (settings.logging.level === 'debug') {
+    connection.console.log(`Folding ranges debug: Found ${gosubTargets.size} GOSUB target lines: ${[...gosubTargets].join(', ')}`);
   }
 
   // Second pass: identify folding ranges
@@ -3433,6 +3445,9 @@ connection.onFoldingRanges((params: FoldingRangeParams): FoldingRange[] => {
     // FOR...NEXT folding
     if (/\bFOR\s+/i.test(upperLine)) {
       forStack.push({ keyword: 'FOR', startLine: i });
+      if (settings.logging.level === 'debug') {
+        connection.console.log(`Folding ranges debug: Found FOR statement on line ${i}`);
+      }
     } else if (/\bNEXT\b/i.test(upperLine)) {
       if (forStack.length > 0) {
         const forLoop = forStack.pop();
@@ -3442,7 +3457,12 @@ connection.onFoldingRanges((params: FoldingRangeParams): FoldingRange[] => {
             endLine: i,
             kind: 'region'
           });
+          if (settings.logging.level === 'debug') {
+            connection.console.log(`Folding ranges debug: Created FOR loop folding range: lines ${forLoop.startLine}-${i}`);
+          }
         }
+      } else if (settings.logging.level === 'debug') {
+        connection.console.log(`Folding ranges debug: Found NEXT statement on line ${i} without matching FOR`);
       }
     }
 
@@ -3450,6 +3470,9 @@ connection.onFoldingRanges((params: FoldingRangeParams): FoldingRange[] => {
     if (lineNum && gosubTargets.has(lineNum)) {
       // This line number is a subroutine target
       subroutines.push({ startLine: i, lineNumber: lineNum });
+      if (settings.logging.level === 'debug') {
+        connection.console.log(`Folding ranges debug: Found subroutine target on line ${i} (line number ${lineNum})`);
+      }
     }
   }
 
@@ -3460,13 +3483,19 @@ connection.onFoldingRanges((params: FoldingRangeParams): FoldingRange[] => {
     for (let i = subroutine.startLine + 1; i < lines.length; i++) {
       if (/\bRETURN\b/i.test(lines[i].toUpperCase())) {
         endLine = i;
+        if (settings.logging.level === 'debug') {
+          connection.console.log(`Folding ranges debug: Found RETURN statement for subroutine ${subroutine.lineNumber} on line ${i}`);
+        }
         break;
       }
-      
+
       // Stop at next subroutine target
       const nextLineMatch = lines[i].match(/^(\d+)\s+/);
       if (nextLineMatch && gosubTargets.has(nextLineMatch[1])) {
         endLine = i - 1;
+        if (settings.logging.level === 'debug') {
+          connection.console.log(`Folding ranges debug: Stopped subroutine ${subroutine.lineNumber} at next subroutine target on line ${i}`);
+        }
         break;
       }
     }
@@ -3477,19 +3506,27 @@ connection.onFoldingRanges((params: FoldingRangeParams): FoldingRange[] => {
         endLine: endLine,
         kind: 'region'
       });
+      if (settings.logging.level === 'debug') {
+        connection.console.log(`Folding ranges debug: Created subroutine folding range: lines ${subroutine.startLine}-${endLine} (subroutine ${subroutine.lineNumber})`);
+      }
+    } else if (settings.logging.level === 'debug') {
+      connection.console.log(`Folding ranges debug: No RETURN found for subroutine ${subroutine.lineNumber}, skipping folding range`);
     }
   }
 
   // DATA block folding (consecutive DATA statements)
   let dataStart: number | null = null;
   let lastDataLine = -1;
-  
+
   for (let i = 0; i < lines.length; i++) {
     const upperLine = lines[i].toUpperCase();
-    
+
     if (/\bDATA\b/i.test(upperLine)) {
       if (dataStart === null) {
         dataStart = i;
+        if (settings.logging.level === 'debug') {
+          connection.console.log(`Folding ranges debug: Started DATA block on line ${i}`);
+        }
       }
       lastDataLine = i;
     } else if (dataStart !== null && i > lastDataLine) {
@@ -3500,6 +3537,9 @@ connection.onFoldingRanges((params: FoldingRangeParams): FoldingRange[] => {
           endLine: lastDataLine,
           kind: 'region'
         });
+        if (settings.logging.level === 'debug') {
+          connection.console.log(`Folding ranges debug: Created DATA block folding range: lines ${dataStart}-${lastDataLine}`);
+        }
       }
       dataStart = null;
     }
@@ -3512,9 +3552,41 @@ connection.onFoldingRanges((params: FoldingRangeParams): FoldingRange[] => {
       endLine: lastDataLine,
       kind: 'region'
     });
+    if (settings.logging.level === 'debug') {
+      connection.console.log(`Folding ranges debug: Created final DATA block folding range: lines ${dataStart}-${lastDataLine}`);
+    }
+  }
+
+  // Check for unmatched FOR loops
+  if (forStack.length > 0 && settings.logging.level === 'debug') {
+    connection.console.log(`Folding ranges debug: Warning: ${forStack.length} unmatched FOR statements remain in stack`);
+    forStack.forEach((forLoop, index) => {
+      connection.console.log(`Folding ranges debug: Unmatched FOR ${index + 1}: started on line ${forLoop.startLine}`);
+    });
+  }
+
+  if (settings.logging.level === 'debug') {
+    connection.console.log(`Folding ranges debug: Returning ${foldingRanges.length} folding ranges`);
+    foldingRanges.forEach((range, index) => {
+      connection.console.log(`Folding ranges debug: Range ${index + 1}: lines ${range.startLine}-${range.endLine}, kind: ${range.kind}`);
+    });
   }
 
   return foldingRanges;
+}
+
+connection.onFoldingRanges(async (params: FoldingRangeParams): Promise<FoldingRange[]> => {
+  const document = documents.get(params.textDocument.uri);
+  if (!document) {
+    return [];
+  }
+
+  const settings = await getDocumentSettings(params.textDocument.uri);
+  if (settings.logging.level === 'debug') {
+    connection.console.log(`Folding ranges debug: Processing folding ranges request for ${params.textDocument.uri}`);
+  }
+
+  return getFoldingRanges(document.getText(), settings);
 });
 
 // Call hierarchy provider for GOSUB call graphs
