@@ -18,7 +18,7 @@ Legend: `[x]` = Done, `[ ]` = To Do, `[ ] (WIP)` = In Progress.
 - [x] Hover — Hover responses wired via `connection.onHover`.
 - [x] Go To Definition — GOTO/GOSUB targets resolved through `connection.onDefinition`.
 - [x] Go To Declaration — Variable/line declarations resolved via `connection.onDeclaration`.
-- [ ] Type Definition — Not yet implemented.
+- [x] Type Definition — Jump to variable declarations and referenced line numbers.
 - [ ] Implementation — Not yet implemented.
 - [x] Find References — Implemented with `connection.onReferences`.
 - [ ] Document Highlights — Not yet implemented.
@@ -29,7 +29,7 @@ Legend: `[x]` = Done, `[ ]` = To Do, `[ ] (WIP)` = In Progress.
 - [x] Completion Resolve — Additional detail provided in `onCompletionResolve`.
 - [x] Signature Help — Command signatures exposed through `onSignatureHelp`.
 - [x] Code Actions — Quick fixes/refactors registered via `onCodeAction`.
-- [ ] Code Lens — Not yet implemented.
+- [x] Code Lens — Inline line-number reference counters powered by Code Lens.
 - [x] Diagnostics — Extensive validation produced in `validateTextDocument`.
 - [x] Semantic Tokens — Rich highlighting via `onSemanticTokens`.
 

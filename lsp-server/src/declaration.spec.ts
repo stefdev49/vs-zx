@@ -45,6 +45,14 @@ describe('Declaration utilities', () => {
     expect(identifier).toBe('scores');
   });
 
+  it('finds INPUT declarations for variables', () => {
+    const program = `10 INPUT "Guess";g$\n20 PRINT g$`;
+    const range = findDeclarationRange(program, 'g$');
+    expect(range).toBeTruthy();
+    const identifier = extractText(program, range!.start.line, range!.start.character, range!.end.line, range!.end.character);
+    expect(identifier).toBe('g$');
+  });
+
   it('returns null when declaration is missing', () => {
     const program = `10 PRINT x`;
     const range = findDeclarationRange(program, 'x');

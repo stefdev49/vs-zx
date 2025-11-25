@@ -63,6 +63,21 @@ export function findDeclarationRange(text: string, rawName: string): Range | nul
           matchesIdentifier(tokens[i + 1], normalized, suffix)) {
         return createRangeFromToken(tokens[i + 1]);
       }
+
+      if (keyword === 'INPUT') {
+        for (let j = i + 1; j < tokens.length; j++) {
+          const nextToken = tokens[j];
+          if (nextToken.line !== token.line ||
+              nextToken.type === TokenType.STATEMENT_SEPARATOR ||
+              nextToken.type === TokenType.LINE_NUMBER ||
+              nextToken.type === TokenType.EOF) {
+            break;
+          }
+          if (matchesIdentifier(nextToken, normalized, suffix)) {
+            return createRangeFromToken(nextToken);
+          }
+        }
+      }
       continue;
     }
 

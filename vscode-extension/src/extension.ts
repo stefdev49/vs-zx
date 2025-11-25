@@ -55,6 +55,9 @@ export function activate(context: ExtensionContext) {
 	// Register command for transfer (use source so bundler can include it)
 	const transferCmd = require('./commands/transfer');
 	context.subscriptions.push(transferCmd.register());
+
+	const showReferencesCmd = require('./commands/showReferences');
+	context.subscriptions.push(showReferencesCmd.register());
 }
 
 export function deactivate(): Thenable<void> | undefined {
