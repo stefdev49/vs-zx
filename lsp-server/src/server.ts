@@ -33,6 +33,7 @@ import {
   SemanticTokens,
   SemanticTokensLegend,
   SemanticTokensRangeParams,
+  PrepareRenameParams,
   RenameParams,
   WorkspaceEdit,
   FoldingRangeParams,
@@ -51,6 +52,7 @@ import {
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { ZXBasicLexer, ZXBasicParser, TokenType, Token } from './zxbasic';
 import { basicKeywords, zx128Keywords, interface1Keywords, functions } from 'syntax-definitions';
+import { createRenameEdits, getRenameContext } from './rename-utils';
 
 // Snippet completions for common patterns
 const snippets = [
@@ -248,6 +250,7 @@ connection.onInitialize((params: InitializeParams) => {
 
 connection.onInitialized(() => {
   connection.client.register(DidChangeConfigurationNotification.type, undefined);
+  connection.window.showInformationMessage('ZX BASIC language server initialized and ready.');
 });
 
 // Settings changed notification
@@ -259,6 +262,10 @@ connection.onDidChangeConfiguration(change => {
   if (change.settings && change.settings.zxBasic) {
     globalSettings = <ExampleSettings>(
       change.settings.zxBasic || defaultSettings
+    );
+
+    connection.window.showInformationMessage(
+      `ZX BASIC settings updated (strictMode=${globalSettings.strictMode ? 'on' : 'off'}, model=${globalSettings.model}).`
     );
   }
   
@@ -3290,6 +3297,23 @@ connection.languages.semanticTokens.onRange(async (params: SemanticTokensRangePa
   return { data };
 });
 
+connection.onPrepareRename((params: PrepareRenameParams) => {
+  const document = documents.get(params.textDocument.uri);
+  if (!document) {
+    return null;
+  }
+
+  const context = getRenameContext(document.getText(), params.position);
+  if (!context) {
+    return null;
+  }
+
+  return {
+    range: context.wordRange,
+    placeholder: context.oldName
+  };
+});
+
 // Rename provider for refactoring variables, line numbers, and functions
 connection.onRenameRequest(async (params: RenameParams): Promise<WorkspaceEdit | null> => {
   const document = documents.get(params.textDocument.uri);
@@ -3297,97 +3321,15 @@ connection.onRenameRequest(async (params: RenameParams): Promise<WorkspaceEdit |
     return null;
   }
 
-  const position = params.position;
   const newName = params.newName;
   const text = document.getText();
-  const lines = text.split('\n');
-  const lineText = lines[position.line];
+  const context = getRenameContext(text, params.position);
 
-  // Get the word at cursor position
-  let wordStart = position.character;
-  let wordEnd = position.character;
-  
-  while (wordStart > 0 && /[A-Za-z0-9_$%]/.test(lineText[wordStart - 1])) {
-    wordStart--;
-  }
-  while (wordEnd < lineText.length && /[A-Za-z0-9_$%]/.test(lineText[wordEnd])) {
-    wordEnd++;
-  }
-  
-  const oldName = lineText.substring(wordStart, wordEnd);
-  if (!oldName) {
+  if (!context) {
     return null;
   }
 
-  const edits: TextEdit[] = [];
-
-  // Check if this is a line number (rename GOTO/GOSUB targets)
-  const isLineNumber = /^\d+$/.test(oldName);
-  
-  if (isLineNumber) {
-    // Rename line number - update:
-    // 1. The line number itself
-    // 2. All GOTO/GOSUB references to this line
-    
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const lineMatch = line.match(/^(\d+)\s+/);
-      
-      // Replace line number at start of line
-      if (lineMatch && lineMatch[1] === oldName) {
-        edits.push({
-          range: {
-            start: { line: i, character: 0 },
-            end: { line: i, character: oldName.length }
-          },
-          newText: newName
-        });
-      }
-      
-      // Replace GOTO/GOSUB targets
-      const gotoPattern = new RegExp(`\\b(GOTO|GO\\s+TO|GOSUB|GO\\s+SUB)\\s+${oldName}\\b`, 'gi');
-      let match;
-      while ((match = gotoPattern.exec(line)) !== null) {
-        const keyword = match[1];
-        const targetStart = match.index + keyword.length;
-        
-        // Find the exact position of the line number after the keyword
-        let numStart = targetStart;
-        while (numStart < line.length && /\s/.test(line[numStart])) {
-          numStart++;
-        }
-        
-        edits.push({
-          range: {
-            start: { line: i, character: numStart },
-            end: { line: i, character: numStart + oldName.length }
-          },
-          newText: newName
-        });
-      }
-    }
-  } else {
-    // Rename variable - update all references
-    // Match whole word to avoid partial matches
-    const varPattern = new RegExp(`\\b${oldName.replace(/[$%]/, '\\$|\\%')}\\b`, 'g');
-    
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      let match;
-      const regex = new RegExp(`\\b${oldName}\\b`, 'g');
-      
-      while ((match = regex.exec(line)) !== null) {
-        edits.push({
-          range: {
-            start: { line: i, character: match.index },
-            end: { line: i, character: match.index + oldName.length }
-          },
-          newText: newName
-        });
-      }
-    }
-  }
-
+  const edits = createRenameEdits(text.split('\n'), context, newName);
   return {
     changes: {
       [params.textDocument.uri]: edits

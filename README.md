@@ -38,7 +38,7 @@ Legend: `[x]` = Done, `[ ]` = To Do, `[ ] (WIP)` = In Progress.
 - [ ] Range Formatting — Not yet implemented.
 - [ ] On Type Formatting — Not yet implemented.
 - [x] Rename — Variable and line-number rename supported in `onRenameRequest`.
-- [ ] (WIP) Prepare Rename — Capability advertises `prepareProvider` but no handler is registered.
+- [x] Prepare Rename — Validation handler ensures rename targets exist before edits.
 - [ ] Selection Range — Not yet implemented.
 
 ### Advanced Analysis
@@ -56,7 +56,7 @@ Legend: `[x]` = Done, `[ ]` = To Do, `[ ] (WIP)` = In Progress.
 - [ ] Progress Reporting — Not yet implemented.
 
 ### UI & Communication
-- [ ] (WIP) Window & Logging APIs — Internal logging uses `connection.console`, but no `window/showMessage` hooks yet.
+- [x] Window & Logging APIs — Initialization and settings changes notify via `connection.window.showInformationMessage`.
 - [ ] Experimental/Custom Requests — Not yet implemented.
 
 > Status audit based on `lsp-server/src/server.ts` and associated spec files as of 25 Nov 2025.
