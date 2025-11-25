@@ -1,40 +1,4 @@
 10 REM convert date to day
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 20 REM constants
 30 LET CENTURY_START = 1901
 40 LET CENTURY_END = 2000

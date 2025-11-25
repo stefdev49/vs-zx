@@ -17,7 +17,7 @@ Legend: `[x]` = Done, `[ ]` = To Do, `[ ] (WIP)` = In Progress.
 - [ ] Workspace Symbols — Not yet implemented.
 - [x] Hover — Hover responses wired via `connection.onHover`.
 - [x] Go To Definition — GOTO/GOSUB targets resolved through `connection.onDefinition`.
-- [ ] Go To Declaration — Not yet implemented.
+- [x] Go To Declaration — Variable/line declarations resolved via `connection.onDeclaration`.
 - [ ] Type Definition — Not yet implemented.
 - [ ] Implementation — Not yet implemented.
 - [x] Find References — Implemented with `connection.onReferences`.

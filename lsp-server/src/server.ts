@@ -19,6 +19,7 @@ import {
   DocumentSymbol,
   DocumentSymbolParams,
   SymbolKind,
+  DeclarationParams,
   Location,
   DefinitionParams,
   ReferenceParams,
@@ -53,6 +54,9 @@ import { TextDocument } from 'vscode-languageserver-textdocument';
 import { ZXBasicLexer, ZXBasicParser, TokenType, Token } from './zxbasic';
 import { basicKeywords, zx128Keywords, interface1Keywords, functions } from 'syntax-definitions';
 import { createRenameEdits, getRenameContext } from './rename-utils';
+import { findDeclarationRange } from './declaration-utils';
+import { isImplicitStringSlice } from './array-utils';
+import { isDrawingAttribute } from './color-utils';
 
 // Snippet completions for common patterns
 const snippets = [
@@ -229,6 +233,7 @@ connection.onInitialize((params: InitializeParams) => {
       },
       documentSymbolProvider: true,
       definitionProvider: true,
+      declarationProvider: true,
       referencesProvider: true,
       codeActionProvider: {
         codeActionKinds: [CodeActionKind.QuickFix, CodeActionKind.Refactor]
@@ -616,6 +621,9 @@ async function validateTextDocument(textDocument: TextDocument): Promise<Diagnos
     const token = tokens[i];
     
     if (token.type === TokenType.KEYWORD && colorKeywords.includes(token.value)) {
+      if ((token.value === 'INK' || token.value === 'PAPER') && isDrawingAttribute(tokens, i)) {
+        continue;
+      }
       // Look for the next number token as the color value
       for (let j = i + 1; j < tokens.length; j++) {
         const nextToken = tokens[j];
@@ -756,9 +764,14 @@ async function validateTextDocument(textDocument: TextDocument): Promise<Diagnos
         }
         usedDimensions++; // At least one dimension/parameter
         
-        // If TO keyword is present, this is string slicing, not array access
-        if (hasToKeyword) {
-          // String slicing syntax like a$(TO 10) or a$(5 TO 10) - don't validate as array
+        const hasDeclaration = dimDeclarations.has(arrayName);
+
+        if (isImplicitStringSlice({
+          isStringVariable,
+          hasToKeyword,
+          usedDimensions,
+          hasDeclaration
+        })) {
           continue;
         }
         
@@ -2449,7 +2462,44 @@ connection.onDocumentSymbol((params: DocumentSymbolParams): DocumentSymbol[] => 
   return symbols;
 });
 
-// Go to Definition Provider - jump to line numbers from GOTO/GOSUB
+// Go to Declaration Provider - jump to variable declarations or line numbers
+connection.onDeclaration((params: DeclarationParams): Location | null => {
+  const document = documents.get(params.textDocument.uri);
+  if (!document) {
+    return null;
+  }
+
+  const text = document.getText();
+  const context = getRenameContext(text, params.position);
+  if (!context) {
+    return null;
+  }
+
+  if (context.isLineNumber) {
+    const lexer = new ZXBasicLexer();
+    const tokens = lexer.tokenize(text);
+    const targetLine = context.oldName;
+    for (const token of tokens) {
+      if (token.type === TokenType.LINE_NUMBER && token.value === targetLine) {
+        const range: Range = {
+          start: { line: token.line, character: token.start },
+          end: { line: token.line, character: token.end }
+        };
+        return Location.create(params.textDocument.uri, range);
+      }
+    }
+    return null;
+  }
+
+  const range = findDeclarationRange(text, context.oldName);
+  if (!range) {
+    return null;
+  }
+
+  return Location.create(params.textDocument.uri, range);
+});
+
+// Go to Definition Provider - jump to line numbers or variable declarations
 connection.onDefinition((params: DefinitionParams): Location | null => {
   const document = documents.get(params.textDocument.uri);
   if (!document) {
@@ -2457,6 +2507,15 @@ connection.onDefinition((params: DefinitionParams): Location | null => {
   }
 
   const text = document.getText();
+  const context = getRenameContext(text, params.position);
+
+  if (context && !context.isLineNumber) {
+    const range = findDeclarationRange(text, context.oldName);
+    if (range) {
+      return Location.create(params.textDocument.uri, range);
+    }
+  }
+
   const lexer = new ZXBasicLexer();
   const tokens = lexer.tokenize(text);
 
