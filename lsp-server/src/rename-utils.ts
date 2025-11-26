@@ -116,7 +116,7 @@ export function createRenameEdits(lines: string[], context: RenameContext, newNa
     }
   } else {
     const escaped = escapeRegExp(oldName);
-    const regex = new RegExp(`(^|[^A-Za-z0-9_$%])(${escaped})(?=[^A-Za-z0-9_$%]|$)`, 'g');
+    const regex = new RegExp(`(^|[^A-Za-z0-9_$%])(${escaped})(?=[^A-Za-z0-9_$%]|$)`, 'gi');
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];

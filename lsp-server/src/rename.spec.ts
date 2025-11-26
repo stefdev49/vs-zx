@@ -56,6 +56,26 @@ describe('Rename utilities', () => {
     expect(updated).toBe(`10 LET author$ = "Ada"\n20 PRINT author$`);
   });
 
+  it('renames identifiers regardless of case', () => {
+    const program = `10 LET R$ = "A"\n20 PRINT r$\n30 PRINT R$`;
+    const context = getRenameContext(program, getPosition(0, 8));
+    expect(context?.oldName).toBe('R$');
+    const edits = createRenameEdits(program.split('\n'), context!, 'x$');
+    const updated = applyEdits(program, edits);
+
+    expect(updated).toBe(`10 LET x$ = "A"\n20 PRINT x$\n30 PRINT x$`);
+  });
+
+  it('does not rename identifiers that merely contain the name', () => {
+    const program = `10 LET r$ = "A"\n20 LET rr$ = "B"`;
+    const context = getRenameContext(program, getPosition(0, 8));
+    expect(context?.oldName).toBe('r$');
+    const edits = createRenameEdits(program.split('\n'), context!, 'x$');
+    const updated = applyEdits(program, edits);
+
+    expect(updated).toBe(`10 LET x$ = "A"\n20 LET rr$ = "B"`);
+  });
+
   it('renames line numbers and updates GO TO / GOSUB targets', () => {
     const program = `100 PRINT "Start"\n200 GO TO 100\n300 GOSUB 100\n400 END`;
     const context = getRenameContext(program, getPosition(0, 1));

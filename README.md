@@ -59,5 +59,3 @@ Legend: `[x]` = Done, `[ ]` = To Do, `[ ] (WIP)` = In Progress.
 - [x] Window & Logging APIs — Initialization and settings changes notify via `connection.window.showInformationMessage`.
 - [ ] Experimental/Custom Requests — Not yet implemented.
 
-> Status audit based on `lsp-server/src/server.ts` and associated spec files as of 25 Nov 2025.
-
