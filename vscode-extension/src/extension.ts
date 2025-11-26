@@ -1,14 +1,111 @@
 import * as path from 'path';
-import { workspace, ExtensionContext } from 'vscode';
+import {
+	workspace,
+	ExtensionContext,
+	CodeLens,
+	Uri,
+	Position,
+	Range,
+	Location
+} from 'vscode';
 
 import {
 	LanguageClient,
 	LanguageClientOptions,
+	Middleware,
 	ServerOptions,
 	TransportKind
 } from 'vscode-languageclient/node';
 
 let client: LanguageClient;
+
+type SerializedPosition = { line: number; character: number };
+type SerializedRange = { start: SerializedPosition; end: SerializedPosition };
+type SerializedLocation = { uri: string; range: SerializedRange };
+
+const SHOW_REFERENCES_COMMAND = 'zx-basic.showReferences';
+
+function isSerializedPosition(value: unknown): value is SerializedPosition {
+	return (
+		typeof value === 'object' &&
+		value !== null &&
+		typeof (value as SerializedPosition).line === 'number' &&
+		typeof (value as SerializedPosition).character === 'number'
+	);
+}
+
+function isSerializedRange(value: unknown): value is SerializedRange {
+	return (
+		typeof value === 'object' &&
+		value !== null &&
+		isSerializedPosition((value as SerializedRange).start) &&
+		isSerializedPosition((value as SerializedRange).end)
+	);
+}
+
+function isSerializedLocation(value: unknown): value is SerializedLocation {
+	return (
+		typeof value === 'object' &&
+		value !== null &&
+		typeof (value as SerializedLocation).uri === 'string' &&
+		isSerializedRange((value as SerializedLocation).range)
+	);
+}
+
+function revivePosition(data: SerializedPosition): Position {
+	return new Position(data.line, data.character);
+}
+
+function reviveRange(data: SerializedRange): Range {
+	return new Range(revivePosition(data.start), revivePosition(data.end));
+}
+
+function reviveLocation(data: SerializedLocation): Location {
+	return new Location(Uri.parse(data.uri), reviveRange(data.range));
+}
+
+function transformShowReferencesLens(lens?: CodeLens | null): CodeLens | null | undefined {
+	if (!lens?.command || lens.command.command !== SHOW_REFERENCES_COMMAND) {
+		return lens;
+	}
+
+	const [uriString, positionData, locationsData] = lens.command.arguments ?? [];
+	if (
+		typeof uriString !== 'string' ||
+		!isSerializedPosition(positionData) ||
+		!Array.isArray(locationsData)
+	) {
+		return lens;
+	}
+
+	try {
+		const uri = Uri.parse(uriString);
+		const position = revivePosition(positionData);
+		const locations = locationsData
+			.filter(isSerializedLocation)
+			.map(reviveLocation);
+
+		lens.command = {
+			title: lens.command.title ?? 'Show References',
+			command: 'editor.action.showReferences',
+			arguments: [uri, position, locations]
+		};
+	} catch (error) {
+		console.error('Failed to convert ZX BASIC CodeLens command', error);
+	}
+
+	return lens;
+}
+
+function transformShowReferencesLensArray(
+	lenses: CodeLens[] | null | undefined
+): CodeLens[] | null | undefined {
+	if (!Array.isArray(lenses)) {
+		return lenses;
+	}
+
+	return lenses.map(lens => transformShowReferencesLens(lens) ?? lens);
+}
 
 export function activate(context: ExtensionContext) {
 	// The server is implemented in node
@@ -32,13 +129,25 @@ export function activate(context: ExtensionContext) {
 	};
 
 	// Options to control the language client
+	const middleware: Middleware = {
+		provideCodeLenses: async (document, token, next) => {
+			const lenses = await next(document, token);
+			return transformShowReferencesLensArray(lenses);
+		},
+		resolveCodeLens: async (codeLens, token, next) => {
+			const resolved = await next(codeLens, token);
+			return transformShowReferencesLens(resolved);
+		}
+	};
+
 	const clientOptions: LanguageClientOptions = {
 		// Register the server for plain text documents
 		documentSelector: [{ scheme: 'file', language: 'zx-basic' }],
 		synchronize: {
 			// Notify the server about file changes to '.clientrc files contained in the workspace
 			fileEvents: workspace.createFileSystemWatcher('**/.clientrc')
-		}
+		},
+		middleware
 	};
 
 	// Create the language client and start the client.
@@ -55,9 +164,6 @@ export function activate(context: ExtensionContext) {
 	// Register command for transfer (use source so bundler can include it)
 	const transferCmd = require('./commands/transfer');
 	context.subscriptions.push(transferCmd.register());
-
-	const showReferencesCmd = require('./commands/showReferences');
-	context.subscriptions.push(showReferencesCmd.register());
 }
 
 export function deactivate(): Thenable<void> | undefined {
