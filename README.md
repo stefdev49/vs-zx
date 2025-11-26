@@ -4,7 +4,7 @@ This vs code extension is a complete environment to support development of progr
 
 ## Features
 
- - Complete ZX Spectrum basic support in vs code with a LSP
+ - Complete ZX Spectrum basic support in vs code with a LSP server
  - Converter fro mtext file to ZX spectrum basic
  - RS232 transfer utility
 
@@ -19,7 +19,7 @@ Legend: `[x]` = Done, `[ ]` = To Do, `[ ] (WIP)` = In Progress.
 - [x] Go To Definition — GOTO/GOSUB targets resolved through `connection.onDefinition`.
 - [x] Go To Declaration — Variable/line declarations resolved via `connection.onDeclaration`.
 - [x] Type Definition — Jump to variable declarations and referenced line numbers.
-- [ ] Implementation — Not yet implemented.
+- [x] Implementation — Interface-style lookups jump to variable declarations or GOTO/GOSUB targets via `connection.onImplementation`.
 - [x] Find References — Implemented with `connection.onReferences`.
 - [ ] Document Highlights — Not yet implemented.
 - [ ] Document Links — Not yet implemented.

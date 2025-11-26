@@ -51,6 +51,7 @@ import {
   DocumentDiagnosticReportKind,
   DocumentDiagnosticParams,
   TypeDefinitionParams,
+  ImplementationParams,
 } from 'vscode-languageserver/node';
 
 import { TextDocument } from 'vscode-languageserver-textdocument';
@@ -61,6 +62,7 @@ import { findDeclarationRange } from './declaration-utils';
 import { isImplicitStringSlice } from './array-utils';
 import { isDrawingAttribute } from './color-utils';
 import { findLineNumberDefinitionRange, findLineNumberDefinitionRangeFromTokens, findLineNumberReferenceRangeFromTokens, buildLineReferenceMap } from './line-number-utils';
+import { findIdentifierReferenceRanges } from './identifier-utils';
 
 // Snippet completions for common patterns
 const snippets = [
@@ -239,6 +241,7 @@ connection.onInitialize((params: InitializeParams) => {
       definitionProvider: true,
       declarationProvider: true,
       typeDefinitionProvider: true,
+      implementationProvider: true,
       referencesProvider: true,
       codeActionProvider: {
         codeActionKinds: [CodeActionKind.QuickFix, CodeActionKind.Refactor]
@@ -2533,6 +2536,39 @@ connection.onTypeDefinition((params: TypeDefinitionParams): Location | null => {
   return null;
 });
 
+connection.onImplementation((params: ImplementationParams): Location | null => {
+  const document = documents.get(params.textDocument.uri);
+  if (!document) {
+    return null;
+  }
+
+  const text = document.getText();
+  const context = getRenameContext(text, params.position);
+  const lexer = new ZXBasicLexer();
+  const tokens = lexer.tokenize(text);
+
+  if (context && !context.isLineNumber) {
+    const range = findDeclarationRange(text, context.oldName);
+    if (range) {
+      return Location.create(params.textDocument.uri, range);
+    }
+  }
+
+  if (context?.isLineNumber) {
+    const definitionRange = findLineNumberDefinitionRangeFromTokens(tokens, context.oldName);
+    if (definitionRange) {
+      return Location.create(params.textDocument.uri, definitionRange);
+    }
+  }
+
+  const referenceRange = findLineNumberReferenceRangeFromTokens(tokens, params.position);
+  if (referenceRange) {
+    return Location.create(params.textDocument.uri, referenceRange);
+  }
+
+  return null;
+});
+
 // Go to Definition Provider - jump to line numbers or variable declarations
 connection.onDefinition((params: DefinitionParams): Location | null => {
   const document = documents.get(params.textDocument.uri);
@@ -2572,41 +2608,79 @@ connection.onReferences((params: ReferenceParams): Location[] => {
   const tokens = lexer.tokenize(text);
   const locations: Location[] = [];
   const referenceMap = buildLineReferenceMap(tokens);
+  const seen = new Set<string>();
+  const pushLocation = (range: Range | null | undefined) => {
+    if (!range) {
+      return;
+    }
+    const key = `${range.start.line}:${range.start.character}-${range.end.line}:${range.end.character}`;
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    locations.push(Location.create(params.textDocument.uri, range));
+  };
+
+  const context = getRenameContext(text, params.position);
+
+  if (context && !context.isLineNumber) {
+    if (params.context.includeDeclaration) {
+      const declarationRange = findDeclarationRange(text, context.oldName);
+      pushLocation(declarationRange);
+    }
+
+    const identifierRanges = findIdentifierReferenceRanges(tokens, context.oldName);
+    identifierRanges.forEach(pushLocation);
+    return locations;
+  }
 
   // Find the token at cursor
   const position = params.position;
+  const adjustedCharacter = position.character + (position.line > 0 ? 1 : 0);
   let targetToken: Token | null = null;
 
   for (const token of tokens) {
-    if (token.line === position.line && 
-        position.character >= token.start && 
-        position.character <= token.end) {
+    if (token.line === position.line &&
+        adjustedCharacter >= token.start &&
+        adjustedCharacter < token.end) {
       targetToken = token;
       break;
     }
   }
 
-  if (!targetToken || targetToken.type !== TokenType.LINE_NUMBER) {
+  if (!targetToken) {
     return [];
   }
 
-  const targetLineNum = targetToken.value;
+  let targetLineNum: string | null = null;
+  let includeDefinition = params.context.includeDeclaration;
 
-  if (params.context.includeDeclaration) {
-    const definitionRange = findLineNumberDefinitionRangeFromTokens(tokens, targetLineNum);
-    if (definitionRange) {
-      locations.push(Location.create(params.textDocument.uri, definitionRange));
+  if (targetToken.type === TokenType.LINE_NUMBER) {
+    targetLineNum = targetToken.value;
+  } else if (targetToken.type === TokenType.NUMBER) {
+    const referenceRange = findLineNumberReferenceRangeFromTokens(tokens, position);
+    if (!referenceRange) {
+      return [];
     }
+    targetLineNum = targetToken.value;
+    includeDefinition = true;
+  } else {
+    return [];
+  }
+
+  if (includeDefinition && targetLineNum) {
+    const definitionRange = findLineNumberDefinitionRangeFromTokens(tokens, targetLineNum);
+    pushLocation(definitionRange);
   }
 
   // Find all references to this line number
-  const referencingTokens = referenceMap.get(targetLineNum) ?? [];
+  const referencingTokens = targetLineNum ? referenceMap.get(targetLineNum) ?? [] : [];
   for (const refToken of referencingTokens) {
     const range: Range = {
       start: { line: refToken.line, character: refToken.start },
       end: { line: refToken.line, character: refToken.end }
     };
-    locations.push(Location.create(params.textDocument.uri, range));
+    pushLocation(range);
   }
 
   return locations;
