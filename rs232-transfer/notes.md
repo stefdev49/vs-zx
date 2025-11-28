@@ -81,3 +81,26 @@ Pin	Name		PC-9	PC-25	Name
 Spectrum 128 RS232 		Spectrum 128 Keypad 		ZX Interface 1 RS232
 
 http://www.fruitcake.plus.com/Sinclair/Interface2/Cartridges/Interface2_RC_New_RS232.htm
+
+
+```mermaid
+graph TD
+    A[Pin 2: TXD] --> B[Pin 3: RXD]
+    C[Pin 7: RTS] --> D[Pin 8: CTS]
+    E[Pin 5: GND] --> F[Pin 5: GND]
+    G[Pin 4: DTR] --> H[Pin 6: DSR]
+    I[Pin 1: DCD] --> J[Pin 1: DCD]
+    
+    subgraph "Female DB9 Connector"
+        A
+        B
+        C
+        D
+        E
+        F
+        G
+        H
+        I
+        J
+    end
+```

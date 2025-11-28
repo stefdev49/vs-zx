@@ -3,7 +3,7 @@
 import { Command } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
-import { convertToTap, convertToRaw, convertToBinary, ProgramMetadata, FileFormat } from './index';
+import { convertBasic, ProgramMetadata, FileFormat } from './index';
 
 const program = new Command();
 
@@ -51,14 +51,19 @@ program
       }
 
       // Convert the BASIC file
+      const conversion = convertBasic(basicText, {
+        programName: metadata.name,
+        autostart: metadata.autostart,
+        suppressWarnings: Boolean(options.quiet)
+      });
+
       let outputBuffer: Buffer;
-      
       switch (format) {
         case 'raw':
-          outputBuffer = convertToRaw(basicText);
+          outputBuffer = conversion.raw;
           break;
         case 'tap':
-          outputBuffer = convertToTap(basicText, metadata);
+          outputBuffer = conversion.tap;
           break;
         default:
           console.error(`Error: Unknown format '${format}'. Use 'tap' or 'raw'.`);
@@ -71,6 +76,9 @@ program
       if (!options.quiet) {
         console.log(`Output written to: ${outputFile}`);
         console.log(`File size: ${outputBuffer.length} bytes`);
+        if (conversion.warnings.length) {
+          conversion.warnings.forEach(msg => console.warn(msg));
+        }
       }
 
     } catch (error) {

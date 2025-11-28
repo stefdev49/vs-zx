@@ -1,16 +1,16 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import {
-  createTapFile,
-  verifyTapChecksums,
-  basicToTap
-} from './bas2tap';
+import { verifyTapChecksums } from './tap-format';
+import { convertToTap as coreConvertToTap } from './index';
 
 /**
  * Helper function to convert BASIC to TAP
  */
-function convertToTap(basicCode: string, metadata: { name: string; autostart?: number }): Buffer {
-  return createTapFile(Buffer.from(basicCode), metadata.name, metadata.autostart);
+function convertToTap(
+  basicCode: string,
+  metadata: { name: string; autostart?: number }
+): Buffer {
+  return coreConvertToTap(basicCode, metadata);
 }
 
 describe('Integration Tests - BAS2TAP Converter', () => {
@@ -168,10 +168,7 @@ describe('Integration Tests - BAS2TAP Converter', () => {
       for (const file of files) {
         const filePath = path.join(samplesDir, file);
         const basicCode = fs.readFileSync(filePath, 'utf-8');
-        const name = path.basename(file, '.bas');
-
-        // Should not throw
-        const tapBuffer = convertToTap(basicCode, { name });
+        const tapBuffer = convertToTap(basicCode, { name: '' });
 
         expect(tapBuffer).toBeInstanceOf(Buffer);
         expect(tapBuffer.length).toBeGreaterThan(0);
@@ -301,27 +298,26 @@ describe('Integration Tests - BAS2TAP Converter', () => {
     test('BASIC code without line numbers', () => {
       const basicNoLines = 'PRINT "No line numbers"';
 
-      // Should not crash
       expect(() => {
         convertToTap(basicNoLines, { name: 'NoLines' });
-      }).not.toThrow();
+      }).toThrow(/Missing line number/i);
     });
 
     test('Mixed valid and invalid lines', () => {
       const mixedBasic = `
-10 PRINT "Valid"
-No line number here
-20 PRINT "Also valid"
-`;
+    10 PRINT "Valid"
+    No line number here
+    20 PRINT "Also valid"
+    `;
 
-      // Should not crash
       expect(() => {
         convertToTap(mixedBasic, { name: 'Mixed' });
-      }).not.toThrow();
+      }).toThrow(/Missing line number/i);
     });
   });
 
   describe('Hex Dump Analysis', () => {
+    // Detailed logging for pangolin.tap structure for parity debugging.
     test('Pangolin TAP hex structure analysis', () => {
       if (!fs.existsSync(path.join(samplesDir, 'pangolin.bas'))) {
         console.warn('Skipping: pangolin.bas not found');

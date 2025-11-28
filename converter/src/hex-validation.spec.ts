@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { createTapFile, verifyTapChecksums } from './bas2tap';
+import { createTapFile, verifyTapChecksums } from './tap-format';
 
 /**
  * Hex dump validation tests for TAP format

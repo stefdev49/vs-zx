@@ -39,27 +39,29 @@ describe('CLI Integration Tests', () => {
     // Read the generated TAP file
     const tap = fs.readFileSync(tapFile);
 
-    // Skip TAP header (first 21 bytes)
-    const programData = tap.slice(23); // Skip header + data block marker + length
+    // First block (header) is 21 bytes, then 2 bytes for data length and 1 byte flag.
+    const programData = tap.slice(24);
 
     // Convert to hex string for easier verification
-    const hexStr = Array.from(programData).map(b => b.toString(16).padStart(2, '0')).join(' ');
+    const hexStr = Array.from(programData)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join(' ');
 
     // Verify tokenization:
-    // Line 10 should start with: 0a 00 (line number 10 in little-endian)
-    expect(hexStr).toContain('0a 00');
+    // Line 10 should start with: 00 0a (line number 10 stored high byte first)
+    expect(hexStr).toContain('00 0a');
 
     // After line number, should have REM token 0xa4, NOT ASCII "REM" (52 45 4d)
-    expect(hexStr).toContain('0a 00 a4'); // Line 10 + REM token
-    expect(hexStr).not.toContain('0a 00 52 45 4d'); // NOT ASCII "REM"
+    expect(hexStr).toContain('00 0a a4'); // Line 10 + REM token
+    expect(hexStr).not.toContain('00 0a 52 45 4d'); // NOT ASCII "REM"
 
-    // Line 20 should have: 14 00 (line 20 in little-endian) + b3 (LET token)
-    expect(hexStr).toContain('14 00 b3'); // Line 20 + LET token
-    expect(hexStr).not.toContain('14 00 4c 45 54'); // NOT ASCII "LET"
+    // Line 20 should have: 00 14 (line 20 stored high byte first) + b3 (LET token)
+    expect(hexStr).toContain('00 14 b3');
+    expect(hexStr).not.toContain('00 14 4c 45 54'); // NOT ASCII "LET"
 
-    // Line 30 should have: 1e 00 (line 30 in little-endian) + b7 (PRINT token)
-    expect(hexStr).toContain('1e 00 b7'); // Line 30 + PRINT token
-    expect(hexStr).not.toContain('1e 00 50 52 49 4e 54'); // NOT ASCII "PRINT"
+    // Line 30 should have: 00 1e (line 30 stored high byte first) + b7 (PRINT token)
+    expect(hexStr).toContain('00 1e b7');
+    expect(hexStr).not.toContain('00 1e 50 52 49 4e 54'); // NOT ASCII "PRINT"
   });
 
   test('CLI with metadata produces correct TAP header', () => {
@@ -117,7 +119,7 @@ describe('CLI Integration Tests', () => {
     });
 
     const tap = fs.readFileSync(tapFile);
-    const programData = tap.slice(23);
+    const programData = tap.slice(24);
     const bytes = Array.from(programData);
 
     // Map of expected tokens (keyword -> token byte)
