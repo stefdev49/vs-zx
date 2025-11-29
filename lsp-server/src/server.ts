@@ -2485,7 +2485,6 @@ connection.onDeclaration((params: DeclarationParams): Location | null => {
   if (!context) {
     return null;
   }
-
   if (context.isLineNumber) {
     const range = findLineNumberDefinitionRange(text, context.oldName);
     if (!range) {
@@ -2968,16 +2967,19 @@ function uppercaseKeywords(tokens: Token[], document: TextDocument): TextEdit[] 
 connection.onDocumentFormatting((params: DocumentFormattingParams): TextEdit[] => {
   const document = documents.get(params.textDocument.uri);
   if (!document) {
+    connection.console.log(`[format] No document found for ${params.textDocument.uri}`);
     return [];
   }
 
+  connection.console.log(`[format] Received format request for ${params.textDocument.uri}`);
   const text = document.getText();
   const lexer = new ZXBasicLexer();
   const tokens = lexer.tokenize(text);
   const edits: TextEdit[] = [];
 
   // First pass: auto-renumber lines
-  const renumberEdits = autoRenumberLines(document);
+  const { edits: renumberEdits, touchedLines } = autoRenumberLines(document);
+  connection.console.log(`[format] autoRenumberLines produced ${renumberEdits.length} edits for ${params.textDocument.uri}`);
   edits.push(...renumberEdits);
 
   // Second pass: format each line (spacing, uppercase, etc.)
@@ -2987,9 +2989,11 @@ connection.onDocumentFormatting((params: DocumentFormattingParams): TextEdit[] =
   for (const token of tokens) {
     if (token.line !== currentLine && currentLine >= 0) {
       // Process previous line
-      const formatted = formatLine(lineTokens, document);
-      if (formatted) {
-        edits.push(formatted);
+      if (!touchedLines.has(currentLine)) {
+        const formatted = formatLine(lineTokens, document);
+        if (formatted) {
+          edits.push(formatted);
+        }
       }
       lineTokens = [];
     }
@@ -3000,13 +3004,14 @@ connection.onDocumentFormatting((params: DocumentFormattingParams): TextEdit[] =
   }
 
   // Process last line
-  if (lineTokens.length > 0) {
+  if (lineTokens.length > 0 && !touchedLines.has(currentLine)) {
     const formatted = formatLine(lineTokens, document);
     if (formatted) {
       edits.push(formatted);
     }
   }
 
+  connection.console.log(`[format] Returning ${edits.length} total edits for ${params.textDocument.uri}`);
   return edits;
 });
 
@@ -3079,8 +3084,15 @@ function formatLine(tokens: Token[], document: TextDocument): TextEdit | null {
 }
 
 // Helper function to auto-renumber lines
-function autoRenumberLines(document: TextDocument): TextEdit[] {
+type RenumberResult = {
+  edits: TextEdit[];
+  touchedLines: Set<number>;
+};
+
+function autoRenumberLines(document: TextDocument): RenumberResult {
+  connection.console.log(`[renumber] Starting renumber pass for ${document.uri}`);
   const edits: TextEdit[] = [];
+  const touchedLines = new Set<number>();
   const text = document.getText();
   const lines = text.split('\n');
   
@@ -3105,6 +3117,8 @@ function autoRenumberLines(document: TextDocument): TextEdit[] {
     
     lineNum += 10;
   }
+
+  connection.console.log(`[renumber] Mapped ${lineNumberMap.size} existing line numbers for ${document.uri}`);
 
   // Now apply the renumbering with GOTO/GOSUB target updates
   lineNum = 10;
@@ -3149,6 +3163,7 @@ function autoRenumberLines(document: TextDocument): TextEdit[] {
     
     // Only add edit if content changed
     if (newLine !== line) {
+      touchedLines.add(i);
       edits.push({
         range: {
           start: { line: i, character: 0 },
@@ -3161,7 +3176,8 @@ function autoRenumberLines(document: TextDocument): TextEdit[] {
     lineNum += 10;
   }
 
-  return edits;
+  connection.console.log(`[renumber] Produced ${edits.length} renumber edits for ${document.uri}`);
+  return { edits, touchedLines };
 }
 
 // Semantic tokens provider for syntax highlighting

@@ -25,6 +25,12 @@ export interface ConvertArtifacts {
   warnings: string[];
 }
 
+export interface ObjectInfo {
+  lineNumber: number;
+  offset: number;
+  length: number;
+}
+
 interface PreparedLine {
   lineNumber: number;
   prepared: string;
@@ -69,7 +75,18 @@ export function convertBasicSource(
     }
   });
 
-  const rawBuffer = Buffer.concat(rawLines.map(bytes => Buffer.from(bytes)));
+  // Build raw buffer and collect per-object offsets/lengths
+  const objects: ObjectInfo[] = [];
+  const parts: Buffer[] = [];
+  let currentOffset = 0;
+  rawLines.forEach(bytes => {
+    const buf = Buffer.from(bytes);
+    parts.push(buf);
+    const ln = (buf[0] << 8) | buf[1];
+    objects.push({ lineNumber: ln, offset: currentOffset, length: buf.length });
+    currentOffset += buf.length;
+  });
+  const rawBuffer = Buffer.concat(parts);
 
   if (rawBuffer.length > MAX_TAP_SIZE) {
     throw new Error('ERROR - Object file too large');
@@ -83,6 +100,29 @@ export function convertBasicSource(
     tap: tapBuffer,
     warnings: state.warnings
   };
+}
+
+export function convertBasicWithObjects(source: string, options: Bas2TapOptions = {}): { artifacts: ConvertArtifacts; objects: ObjectInfo[] } {
+  const artifacts = convertBasicSource(source, options);
+  const objects: ObjectInfo[] = [];
+  const state: ConversionState = {
+    previousLineNumber: -1,
+    warnings: [],
+    caseInsensitive: options.caseInsensitive === undefined ? true : options.caseInsensitive,
+    suppressWarnings: Boolean(options.suppressWarnings)
+  };
+  const physicalLines = source.replace(/\r\n?/g, '\n').split('\n');
+  let currentOffset = 0;
+  physicalLines.forEach((line, index) => {
+    const prepared = prepareLine(line, index + 1, state);
+    if (!prepared) return;
+    const built = buildLine(prepared, state);
+    if (built) {
+      objects.push({ lineNumber: built.lineNumber, offset: currentOffset, length: built.bytes.length });
+      currentOffset += built.bytes.length;
+    }
+  });
+  return { artifacts, objects };
 }
 
 function prepareLine(line: string, fileLineNo: number, state: ConversionState): PreparedLine | null {
@@ -318,7 +358,10 @@ function buildLine(prepped: PreparedLine, state: ConversionState): LineBuildResu
     }
 
     if (ch === ' ') {
-      idx++;
+      appendByte(0x20);
+      while (idx < content.length && content[idx] === ' ') {
+        idx++;
+      }
       continue;
     }
 
@@ -539,11 +582,6 @@ function handleNumberLiteral(
 
   const encoded = encodeNumber(numericValue);
   encoded.forEach(appendByte);
-
-  while (idx < line.length && line[idx] === ' ') {
-    idx++;
-  }
-
   return { consumed: idx - start };
 }
 
@@ -603,42 +641,51 @@ function expandSequence(
 }
 
 function buildTap(raw: Buffer, name: string, autostart: number): Buffer {
-  const header = Buffer.alloc(21, 0);
-  header[0] = 19;
-  header[1] = 0;
-  header[2] = 0x00;
-  header[3] = 0x00;
+  // Build header block as struct TapeHeader_s (24 bytes) to match bas2tap.c
+  const header = Buffer.alloc(24, 0);
+  header[0] = 19; // LenLo1 (dummy length of header part)
+  header[1] = 0; // LenHi1
+  header[2] = 0x00; // Flag1
+  header[3] = 0x00; // HType (file type BASIC)
   for (let i = 0; i < 10; i++) {
-    header[4 + i] = name.charCodeAt(i) || 0x20;
+    header[4 + i] = (name.charCodeAt(i) || 0x20) & 0xff;
   }
 
-  const programLength = raw.length & 0xffff;
-  header[14] = programLength & 0xff;
-  header[15] = (programLength >> 8) & 0xff;
+  // Follow bas2tap.c: BlockSize is the total size of all resulting BASIC objects
+  // (i.e. the raw program data length). The data block length (Len2) is
+  // BlockSize + 2 (flag + checksum). HLen and HBasLen must be set to BlockSize.
+  const blockSize = raw.length & 0xffff;
 
+  // HLen (offsets 14-15)
+  header[14] = blockSize & 0xff;
+  header[15] = (blockSize >> 8) & 0xff;
+
+  // HStart (autostart) (offsets 16-17)
   header[16] = autostart & 0xff;
   header[17] = (autostart >> 8) & 0xff;
 
-  const variableArea = (0x8000 + programLength) & 0xffff;
-  header[18] = variableArea & 0xff;
-  header[19] = (variableArea >> 8) & 0xff;
+  // HBasLen (offsets 18-19)
+  header[18] = blockSize & 0xff;
+  header[19] = (blockSize >> 8) & 0xff;
 
-  let parity = 0;
+  // Parity1 is XOR of header bytes 2..19 (inclusive)
+  let parity1 = 0;
   for (let i = 2; i < 20; i++) {
-    parity ^= header[i];
+    parity1 ^= header[i];
   }
-  header[20] = parity;
+  header[20] = parity1;
 
-  const dataLength = raw.length + 2;
-  const dataHeader = Buffer.alloc(3);
-  dataHeader[0] = dataLength & 0xff;
-  dataHeader[1] = (dataLength >> 8) & 0xff;
-  dataHeader[2] = 0xff;
+  // Len2 (offsets 21-22) = BlockSize + 2
+  const len2 = (blockSize + 2) & 0xffff;
+  header[21] = len2 & 0xff;
+  header[22] = (len2 >> 8) & 0xff;
 
-  let dataParity = dataHeader[2];
-  for (const byte of raw) {
-    dataParity ^= byte;
-  }
+  // Flag2 (offset 23) - bas2tap uses 255
+  header[23] = 0xff;
 
-  return Buffer.concat([header, dataHeader, raw, Buffer.from([dataParity])]);
+  // Data parity: start with Flag2 and XOR all program data bytes (same as bas2tap.c)
+  let dataParity = header[23];
+  for (let i = 0; i < raw.length; i++) dataParity ^= raw[i];
+
+  return Buffer.concat([header, raw, Buffer.from([dataParity])]);
 }

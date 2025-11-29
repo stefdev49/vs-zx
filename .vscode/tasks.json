@@ -42,7 +42,7 @@
       "command": "bash",
       "args": [
         "-lc",
-        "LATEST=$(ls -t vscode-extension/*.vsix | head -n1) && if [ -n \"$LATEST\" ]; then code --install-extension \"$LATEST\" --force; else echo 'No vsix found'; fi"
+        "LATEST=$(ls -t vscode-extension/*.vsix | head -n1) && if [ -n \"$LATEST\" ]; then code --install-extension \"$LATEST\" --force; else echo \"No vsix found\"; fi"
       ],
       "presentation": {
         "reveal": "always",

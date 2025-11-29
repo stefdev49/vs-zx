@@ -6,7 +6,10 @@ import {
 	Uri,
 	Position,
 	Range,
-	Location
+	Location,
+	TextDocument,
+	FormattingOptions,
+	CancellationToken
 } from 'vscode';
 
 import {
@@ -137,6 +140,18 @@ export function activate(context: ExtensionContext) {
 		resolveCodeLens: async (codeLens, token, next) => {
 			const resolved = await next(codeLens, token);
 			return transformShowReferencesLens(resolved);
+		},
+		provideDocumentFormattingEdits: async (
+			document: TextDocument,
+			options: FormattingOptions,
+			token: CancellationToken,
+			next
+		) => {
+			console.log(`[zx-basic] Sending format request for ${document.uri.toString()}`);
+			const edits = await next(document, options, token);
+			const editCount = Array.isArray(edits) ? edits.length : 0;
+			console.log(`[zx-basic] Received ${editCount} formatting edits for ${document.uri.toString()}`);
+			return edits;
 		}
 	};
 
