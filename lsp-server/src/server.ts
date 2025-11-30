@@ -3895,5 +3895,12 @@ connection.languages.callHierarchy.onOutgoingCalls(async (params: CallHierarchyO
   return outgoingCalls;
 });
 
-documents.listen(connection);
-connection.listen();
+if (process.env.NODE_ENV !== 'test') {
+  documents.listen(connection);
+  connection.listen();
+} else {
+  // During tests we avoid starting the LSP listeners to prevent createConnection
+  // from attempting to use stdio/socket streams. Tests should import pure helpers
+  // (or the utils modules) instead of importing the whole server that starts
+  // runtime services.
+}

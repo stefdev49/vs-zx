@@ -2,7 +2,7 @@
   "name": "zx-basic-vscode-extension",
   "repository": "git+https://github.com/stef/vs-zx.git",
   "displayName": "ZX BASIC Development Environment",
-  "version": "1.0.76",
+  "version": "1.0.83",
   "description": "VS Code extension for ZX Spectrum BASIC development with Interface 1 transfer",
   "license": "MIT",
   "engines": {
@@ -140,7 +140,9 @@
     "test": "node ./out/test/runTest.js"
   },
   "dependencies": {
-    "vscode-languageclient": "^9.0.0",
+    "vscode-languageclient": "^9.0.0"
+  },
+  "optionalDependencies": {
     "serialport": "^13.0.0"
   },
   "devDependencies": {

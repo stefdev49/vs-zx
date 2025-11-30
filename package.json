@@ -30,6 +30,10 @@
     "test": "npm run test --workspaces",
     "lint": "npm run lint --workspaces",
     "format": "prettier --write .",
-    "package": "cd vscode-extension && npm version patch --no-git-tag-version && cd .. && npm run rebuild-native && cd vscode-extension && npx vsce package --no-dependencies && echo 'VS Code extension packaged successfully in vscode-extension/'"
+    "package": "cd vscode-extension && npm version patch --no-git-tag-version && cd .. && npm run rebuild-native && cd vscode-extension && npx vsce package --no-dependencies && echo 'VS Code extension packaged successfully in vscode-extension/'",
+    "clean:vsix": "rm -f vscode-extension/*.vsix || true",
+    "clean:outs": "rm -rf vscode-extension/out lsp-server/out server out && rm -rf syntax-definitions/out || true",
+    "clean:node": "rm -rf node_modules && rm -rf **/node_modules || true",
+    "clean": "npm run clean:vsix && npm run clean:outs && echo 'clean complete'"
   }
 }
