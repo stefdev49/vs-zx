@@ -8,6 +8,7 @@ This vs code extension is a complete environment to support development of progr
  - Converter from text file to ZX spectrum basic
  - RS232 transfer utility
  - **Save as TZX** - Convert BASIC programs to TZX tape format for use with emulators and tape preservation tools
+ - **Play to ZX Spectrum** - Convert and play BASIC programs directly through audio using tzxplay, no file writing needed
 
 ## LSP Feature Roadmap
 
@@ -68,3 +69,40 @@ Legend: `[x]` = Done, `[ ]` = To Do, `[ ] (WIP)` = In Progress.
 - [x] Window & Logging APIs — Initialization and settings changes notify via `connection.window.showInformationMessage`.
 - [ ] Experimental/Custom Requests — Not yet implemented.
 
+
+## Audio Playback Feature
+
+The **Play to ZX Spectrum** feature allows you to play BASIC programs directly through your computer's audio output without creating intermediate files.
+
+### Requirements
+
+Install `tzxplay` from [https://github.com/patrikpersson/tzxtools](https://github.com/patrikpersson/tzxtools):
+
+```bash
+pip install tzxtools
+```
+
+### Usage
+
+1. Open a `.bas` file in VS Code
+2. Run command: **ZX BASIC: Play to ZX Spectrum** (Ctrl+Shift+P)
+3. Enter program name and optional autostart line
+4. The program will be converted to TZX and played through your audio output
+5. Connect your ZX Spectrum's tape input to your computer's audio output
+6. On the Spectrum, type `LOAD ""` and press ENTER
+7. Click the "Playing to ZX..." status bar item to stop playback at any time
+
+### Configuration
+
+- `zxBasic.tzxplay.path` - Path to tzxplay executable (default: "tzxplay")
+- `zxBasic.tzxplay.mode48k` - Enable ZX Spectrum 48K mode (default: false)  
+- `zxBasic.tzxplay.sine` - Generate soft sine pulses instead of square pulses (default: false)
+
+### Progress Monitoring
+
+The **ZX Spectrum Playback** output channel shows real-time progress including:
+- TZX size and program details
+- Block-by-block playback status
+- Completion or error messages
+
+Press `Ctrl+Shift+U` or click View > Output and select "ZX Spectrum Playback" to view progress.

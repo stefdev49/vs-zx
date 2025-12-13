@@ -183,9 +183,19 @@ export function activate(context: ExtensionContext) {
 	// Register command for save as TZX
 	const saveAsTzxCmd = require('./commands/saveAsTzx');
 	context.subscriptions.push(saveAsTzxCmd.register());
+
+	// Register command for play to ZX
+	const playToZxCmd = require('./commands/playToZx');
+	playToZxCmd.register(context);
 }
 
 export function deactivate(): Thenable<void> | undefined {
+	// Clean up any active playback
+	const playToZxCmd = require('./commands/playToZx');
+	if (playToZxCmd.deactivate) {
+		playToZxCmd.deactivate();
+	}
+
 	if (!client) {
 		return undefined;
 	}

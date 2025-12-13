@@ -2,7 +2,7 @@
   "name": "zx-basic-vscode-extension",
   "repository": "git+https://github.com/stef/vs-zx.git",
   "displayName": "ZX BASIC Development Environment",
-  "version": "1.0.102",
+  "version": "1.0.107",
   "description": "VS Code extension for ZX Spectrum BASIC development with Interface 1 transfer",
   "license": "MIT",
   "engines": {
@@ -45,6 +45,18 @@
         "command": "zx-basic.saveAsTzx",
         "title": "Save as TZX",
         "category": "ZX BASIC"
+      },
+      {
+        "command": "zx-basic.playToZx",
+        "title": "Play to ZX Spectrum",
+        "category": "ZX BASIC",
+        "icon": "$(play)"
+      },
+      {
+        "command": "zx-basic.stopTzxPlayback",
+        "title": "Stop ZX Playback",
+        "category": "ZX BASIC",
+        "icon": "$(debug-stop)"
       }
     ],
     "menus": {
@@ -56,6 +68,13 @@
         {
           "command": "zx-basic.saveAsTzx",
           "when": "editorLangId == zx-basic"
+        },
+        {
+          "command": "zx-basic.playToZx",
+          "when": "editorLangId == zx-basic"
+        },
+        {
+          "command": "zx-basic.stopTzxPlayback"
         }
       ],
       "editor/title": [
@@ -64,11 +83,21 @@
           "alt": "zx-basic.transfer",
           "when": "editorLangId == zx-basic",
           "group": "navigation"
+        },
+        {
+          "command": "zx-basic.playToZx",
+          "when": "editorLangId == zx-basic",
+          "group": "1_modification"
         }
       ],
       "editor/context": [
         {
           "command": "zx-basic.saveAsTzx",
+          "when": "editorLangId == zx-basic",
+          "group": "1_modification"
+        },
+        {
+          "command": "zx-basic.playToZx",
           "when": "editorLangId == zx-basic",
           "group": "1_modification"
         }
@@ -132,6 +161,21 @@
               38400
             ],
             "description": "Baud rate for RS232 communication"
+          },
+          "zxBasic.tzxplay.path": {
+            "type": "string",
+            "default": "tzxplay",
+            "description": "Path to tzxplay executable for audio playback"
+          },
+          "zxBasic.tzxplay.mode48k": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enable ZX Spectrum 48K mode for tzxplay"
+          },
+          "zxBasic.tzxplay.sine": {
+            "type": "boolean",
+            "default": false,
+            "description": "Generate soft sine pulses instead of square pulses"
           }
         }
       }
@@ -140,7 +184,9 @@
   "activationEvents": [
     "onLanguage:zx-basic",
     "onCommand:zx-basic.transfer",
-    "onCommand:zx-basic.saveAsTzx"
+    "onCommand:zx-basic.saveAsTzx",
+    "onCommand:zx-basic.playToZx",
+    "onCommand:zx-basic.stopTzxPlayback"
   ],
   "main": "./out/extension.js",
   "scripts": {
