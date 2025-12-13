@@ -2,7 +2,7 @@
   "name": "zx-basic-vscode-extension",
   "repository": "git+https://github.com/stef/vs-zx.git",
   "displayName": "ZX BASIC Development Environment",
-  "version": "1.0.109",
+  "version": "1.0.112",
   "description": "VS Code extension for ZX Spectrum BASIC development with Interface 1 transfer",
   "license": "MIT",
   "engines": {
@@ -67,6 +67,11 @@
         "command": "zx-basic.renumberLines",
         "title": "Renumber Lines",
         "category": "ZX BASIC Refactoring"
+      },
+      {
+        "command": "zx-basic.extractSubroutine",
+        "title": "Extract Subroutine",
+        "category": "ZX BASIC Refactoring"
       }
     ],
     "menus": {
@@ -129,6 +134,11 @@
         {
           "command": "zx-basic.renumberLines",
           "when": "editorLangId == zx-basic",
+          "group": "2_refactoring"
+        },
+        {
+          "command": "zx-basic.extractSubroutine",
+          "when": "editorLangId == zx-basic && editorHasSelection",
           "group": "2_refactoring"
         }
       ]

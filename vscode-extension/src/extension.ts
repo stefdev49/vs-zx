@@ -200,6 +200,9 @@ export function activate(context: ExtensionContext) {
 
   const renumberLinesCmd = require("./commands/refactor/renumberLines");
   context.subscriptions.push(renumberLinesCmd.register());
+
+  const extractSubroutineCmd = require("./commands/refactor/extractSubroutine");
+  context.subscriptions.push(extractSubroutineCmd.register());
 }
 
 export function deactivate(): Thenable<void> | undefined {

@@ -1,4 +1,4 @@
-import { TextDocument, Position, Range, TextEdit, window } from 'vscode';
+import { TextDocument, Position, Range, TextEdit, window } from "vscode";
 
 /**
  * Common utilities for refactoring operations
@@ -93,33 +93,33 @@ export function generateUniqueVariableName(
 }
 
 export function inferVariableType(expression: string): {
-  type: 'string' | 'numeric' | 'integer';
+  type: "string" | "numeric" | "integer";
   suffix: string;
 } {
   // Check if expression contains string operations
-  if (expression.includes('+') && expression.includes('$')) {
-    return { type: 'string', suffix: '$' };
+  if (expression.includes("+") && expression.includes("$")) {
+    return { type: "string", suffix: "$" };
   }
 
   // Check if expression is numeric
   if (
     /^\d+$/.test(expression.trim()) ||
-    expression.includes('+') ||
-    expression.includes('-') ||
-    expression.includes('*') ||
-    expression.includes('/') ||
-    expression.includes('(') ||
-    expression.includes(')')
+    expression.includes("+") ||
+    expression.includes("-") ||
+    expression.includes("*") ||
+    expression.includes("/") ||
+    expression.includes("(") ||
+    expression.includes(")")
   ) {
-    return { type: 'numeric', suffix: '' };
+    return { type: "numeric", suffix: "" };
   }
 
   // Default to numeric
-  return { type: 'numeric', suffix: '' };
+  return { type: "numeric", suffix: "" };
 }
 
 export function isValidExpression(expression: string): boolean {
-  if (!expression || expression.trim() === '') return false;
+  if (!expression || expression.trim() === "") return false;
 
   // Basic validation - should not contain statements or line numbers
   const invalidPatterns = [
@@ -158,9 +158,48 @@ export function findNextAvailableLineNumber(
 
   // Find next available
   let candidate = startFrom;
-  while (lineNumbers.has(candidate)) {
+  const maxAttempts = 1000;
+  let attempts = 0;
+  while (lineNumbers.has(candidate) && attempts < maxAttempts) {
     candidate += 10;
+    attempts++;
+  }
+
+  // Fallback if we can't find a unique name
+  if (attempts >= maxAttempts) {
+    return startFrom + 1000;
   }
 
   return candidate;
+}
+
+export function getLastLineNumber(document: TextDocument): number | null {
+  const text = document.getText();
+  const lineNumbers: number[] = [];
+
+  // Extract all line numbers
+  const regex = /^(\d+)/gm;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    lineNumbers.push(parseInt(match[1]));
+  }
+
+  if (lineNumbers.length === 0) {
+    return null;
+  }
+
+  // Return the highest line number
+  return Math.max(...lineNumbers);
+}
+
+export function removeLineNumbers(text: string): string {
+  // Remove line numbers from the beginning of each line
+  // Preserve the actual code
+  return text
+    .split("\n")
+    .map((line) => {
+      // Remove line number and any following spaces
+      return line.replace(/^\d+\s*/, "");
+    })
+    .join("\n");
 }
