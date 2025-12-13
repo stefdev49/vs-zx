@@ -1,6 +1,7 @@
 import { TextEdit } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { Token, TokenType } from './zxbasic';
+import { Token, TokenType, ZXBasicLexer } from './zxbasic';
+import { buildLineReferenceMap } from './line-number-utils';
 
 export type RenumberResult = {
   edits: TextEdit[];
@@ -55,13 +56,24 @@ export function autoRenumberLines(document: TextDocument): RenumberResult {
       newLine = `${lineNum} ${line}`;
     }
 
-    for (const [oldNum, newNum] of lineNumberMap.entries()) {
-      const goSubPattern = new RegExp(`\\b(GOTO|GO\\s+TO|GOSUB|GO\\s+SUB)\\s+${oldNum}\\b`, 'gi');
-      newLine = newLine.replace(goSubPattern, (match, keyword) => {
-        const normalized = keyword.toUpperCase().replace(/\s+/g, '');
-        return `${normalized === 'GOTO' ? 'GOTO' : 'GOSUB'} ${newNum}`;
-      });
-    }
+    // Apply all line number replacements in one pass to avoid chain replacements
+    // This regex matches GOTO/GOSUB/RUN/LIST/RESTORE followed by a line number
+    newLine = newLine.replace(/\b(GOTO|GO\s+TO|GOSUB|GO\s+SUB|RUN|LIST|RESTORE)\s+(\d+)\b/gi, (match, keyword, lineNumber) => {
+      const normalized = keyword.toUpperCase().replace(/\s+/g, '');
+      // Map keyword variations to canonical form
+      let keywordStr = normalized;
+      if (normalized === 'GOTO') keywordStr = 'GOTO';
+      else if (normalized === 'GOSUB') keywordStr = 'GOSUB';
+      
+      // Check if this line number has a mapping
+      const mappedNumber = lineNumberMap.get(lineNumber);
+      if (mappedNumber) {
+        return `${keywordStr} ${mappedNumber}`;
+      }
+      
+      // No mapping, keep original
+      return match;
+    });
 
     const hadNumber = !!match;
     if (newLine !== line || hadNumber) {

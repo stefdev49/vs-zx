@@ -62,11 +62,11 @@ describe('DEF FN Two-Word Form Tests', () => {
       expect(deffnToken).toBeDefined();
     }
 
-    // Verify DEF is keyword when expected
+    // Verify DEF standalone is identifier (not a keyword in ZX Spectrum BASIC)
     if (input.startsWith('40 LET DEF') || input === '50 DEF') {
       const defToken = tokens.find(t => t.value === 'DEF');
       expect(defToken).toBeDefined();
-      expect(defToken!.type).toBe(TokenType.KEYWORD);
+      expect(defToken!.type).toBe(TokenType.IDENTIFIER);
     }
   });
 

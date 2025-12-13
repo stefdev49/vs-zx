@@ -334,8 +334,8 @@ export class ZXBasicLexer {
       };
     }
     
-    // Special handling for two-word keywords: "GO TO", "GO SUB", "DEF FN"
-    if (value === 'GO' || value === 'DEF') {
+    // Special handling for two-word keywords: "GO TO", "GO SUB", "DEF FN", "INPUT LINE"
+    if (value === 'GO' || value === 'DEF' || value === 'INPUT') {
       const savedPos = this.position;
       const savedCol = this.column;
       
@@ -360,6 +360,8 @@ export class ZXBasicLexer {
           value = 'GOSUB';  // Normalize to single word
         } else if (value === 'DEF' && nextWord === 'FN') {
           value = 'DEFFN';  // Normalize to single word
+        } else if (value === 'INPUT' && nextWord === 'LINE') {
+          value = 'INPUT';  // Keep as INPUT, LINE is consumed as part of INPUT syntax
         } else {
           // Not a two-word keyword, restore position
           this.position = savedPos;
@@ -451,18 +453,26 @@ export class ZXBasicLexer {
 
   private getKeywordType(value: string): TokenType {
     // ZX BASIC keywords (based on ROM disassembly)
+    // Note: Two-word keywords (GO TO, GO SUB, DEF FN, INPUT LINE) are normalized before reaching here
+    // Operators (AND, OR, NOT) have dedicated TokenTypes and are not keywords
+    
+    // Check for operators first (they have dedicated TokenTypes)
+    if (value === 'AND') return TokenType.AND;
+    if (value === 'OR') return TokenType.OR;
+    if (value === 'NOT') return TokenType.NOT;
+    
     const keywords = [
-      'PRINT', 'LET', 'IF', 'THEN', 'ELSE', 'FOR', 'TO', 'STEP', 'NEXT',
+      'PRINT', 'LET', 'IF', 'THEN', 'FOR', 'TO', 'STEP', 'NEXT',
       'READ', 'DATA', 'RESTORE', 'DIM',
-      'DEF', 'FN', 'DEFFN', 'GOTO', 'GOSUB', 'RETURN', 'STOP', 'RANDOMIZE', 'CONTINUE',
+      'FN', 'DEFFN', 'GOTO', 'GOSUB', 'RETURN', 'STOP', 'RANDOMIZE', 'CONTINUE',
       'CLEAR', 'CLS', 'INPUT', 'LOAD', 'SAVE', 'VERIFY', 'MERGE', 'BEEP',
       'INK', 'PAPER', 'FLASH', 'BRIGHT', 'INVERSE', 'OVER', 'BORDER', 'PLOT',
       'DRAW', 'CIRCLE', 'LPRINT', 'LLIST', 'COPY', 'SPECTRUM', 'PLAY', 'ERASE',
-      'CAT', 'FORMAT', 'MOVE', 'OUT', 'IN', 'OPEN', 'CLOSE', 'POKE', 'RUN', 'LIST', 'NEW', 'END', 'PAUSE',
+      'CAT', 'FORMAT', 'MOVE', 'OUT', 'IN', 'OPEN', 'CLOSE', 'POKE', 'RUN', 'LIST', 'NEW', 'PAUSE',
       'VAL', 'LEN', 'STR$', 'CHR$', 'CODE', 'SIN',
       'COS', 'TAN', 'ASN', 'ACS', 'ATN', 'LN', 'EXP', 'INT', 'SQR', 'SGN',
-      'ABS', 'PEEK', 'USR', 'INKEY$', 'PI', 'TRUE', 'FALSE', 'RND', 'ATTR',
-      'SCREEN$', 'POINT', 'TAB', 'AND', 'OR', 'NOT', 'VAL$', 'AT'
+      'ABS', 'PEEK', 'USR', 'INKEY$', 'PI', 'RND', 'ATTR',
+      'SCREEN$', 'POINT', 'TAB', 'VAL$', 'AT'
     ];
 
     if (keywords.includes(value)) {

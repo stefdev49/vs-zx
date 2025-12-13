@@ -66,14 +66,14 @@ describe('ZXBasicLexer', () => {
     expect(tokens.some(t => t.type === TokenType.OPERATOR && t.value === '>=')).toBe(true);
   });
 
-    test('should tokenize logical operators as keywords', () => {
+  test('should tokenize logical operators as operators with dedicated TokenTypes', () => {
     const tokens = lexer.tokenize('AND OR NOT');
     expect(tokens.length).toBeGreaterThan(2); // Should produce multiple tokens
-    const keywords = tokens.filter(t => t.type === TokenType.KEYWORD);
-    expect(keywords.length).toBe(3); // Should have AND, OR, NOT as keywords
-    expect(keywords[0].value).toBe('AND');
-    expect(keywords[1].value).toBe('OR');
-    expect(keywords[2].value).toBe('NOT');
+    const operators = tokens.filter(t => t.type === TokenType.AND || t.type === TokenType.OR || t.type === TokenType.NOT);
+    expect(operators.length).toBe(3); // Should have AND, OR, NOT as operators
+    expect(operators[0].type).toBe(TokenType.AND);
+    expect(operators[1].type).toBe(TokenType.OR);
+    expect(operators[2].type).toBe(TokenType.NOT);
   });
 
   test('should tokenize punctuation', () => {
@@ -141,11 +141,11 @@ describe('ZXBasicLexer', () => {
     expect(tokens1.some(t => t.type === TokenType.KEYWORD && t.value === 'DEFFN')).toBe(true);
     expect(tokens1.filter(t => t.value === 'FN' && t.type === TokenType.KEYWORD).length).toBe(0); // FN should be consumed by DEFFN
     
-    // Test DEF alone (keyword, not followed by FN)
+    // Test DEF alone is NOT a keyword (only DEF FN is valid in ZX Spectrum BASIC)
     const tokens2 = lexer.tokenize('20 DEF');
     const defToken = tokens2.find(t => t.value === 'DEF');
     expect(defToken).toBeDefined();
-    expect(defToken!.type).toBe(TokenType.KEYWORD); // DEF is a keyword in ZX BASIC
+    expect(defToken!.type).toBe(TokenType.IDENTIFIER); // DEF alone is not a keyword
     
     // Test FN alone (used in function calls)
     const tokens3 = lexer.tokenize('30 PRINT FN f(5)');

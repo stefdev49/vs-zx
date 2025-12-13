@@ -63,6 +63,7 @@ import { isImplicitStringSlice } from './array-utils';
 import { isDrawingAttribute } from './color-utils';
 import { findLineNumberDefinitionRange, findLineNumberDefinitionRangeFromTokens, findLineNumberReferenceRangeFromTokens, buildLineReferenceMap } from './line-number-utils';
 import { findIdentifierReferenceRanges } from './identifier-utils';
+import { autoRenumberLines, formatLine } from './formatting-utils';
 
 // Snippet completions for common patterns
 const snippets = [
@@ -3041,170 +3042,9 @@ connection.onDocumentFormatting((params: DocumentFormattingParams): TextEdit[] =
   return edits;
 });
 
-// Helper function to format a single line
-function formatLine(tokens: Token[], document: TextDocument): TextEdit | null {
-  if (tokens.length === 0) {
-    return null;
-  }
 
-  const line = tokens[0].line;
-  const lineText = document.getText({
-    start: { line, character: 0 },
-    end: { line: line + 1, character: 0 }
-  }).replace(/\n$/, '');
 
-  let formatted = '';
-  let prevToken: Token | null = null;
 
-  for (const token of tokens) {
-    // Add space before token if needed
-    if (prevToken) {
-      // Space after line number
-      if (prevToken.type === TokenType.LINE_NUMBER) {
-        formatted += ' ';
-      }
-      // Space around operators (except unary minus)
-      else if (token.type === TokenType.OPERATOR || prevToken.type === TokenType.OPERATOR) {
-        if (!(token.type === TokenType.OPERATOR && token.value === '-' && 
-              (prevToken.type === TokenType.OPERATOR || prevToken.type === TokenType.PUNCTUATION))) {
-          formatted += ' ';
-        }
-      }
-      // Space after keywords
-      else if (prevToken.type === TokenType.KEYWORD) {
-        formatted += ' ';
-      }
-      // Space after commas
-      else if (prevToken.type === TokenType.PUNCTUATION && prevToken.value === ',') {
-        formatted += ' ';
-      }
-      // Space before and after statement separator
-      else if (token.type === TokenType.STATEMENT_SEPARATOR || 
-               prevToken.type === TokenType.STATEMENT_SEPARATOR) {
-        formatted += ' ';
-      }
-    }
-
-    // Uppercase keywords
-    if (token.type === TokenType.KEYWORD) {
-      formatted += token.value.toUpperCase();
-    } else {
-      formatted += token.value;
-    }
-
-    prevToken = token;
-  }
-
-  // Only return edit if formatting changed the line
-  if (formatted !== lineText.trim()) {
-    return {
-      range: {
-        start: { line, character: 0 },
-        end: { line, character: lineText.length }
-      },
-      newText: formatted
-    };
-  }
-
-  return null;
-}
-
-// Helper function to auto-renumber lines
-type RenumberResult = {
-  edits: TextEdit[];
-  touchedLines: Set<number>;
-};
-
-function autoRenumberLines(document: TextDocument): RenumberResult {
-  connection.console.log(`[renumber] Starting renumber pass for ${document.uri}`);
-  const edits: TextEdit[] = [];
-  const touchedLines = new Set<number>();
-  const text = document.getText();
-  const lines = text.split('\n');
-  
-  // Build a mapping of old line numbers to new line numbers
-  const lineNumberMap = new Map<string, string>();
-  let lineNum = 10;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    
-    // Skip empty lines
-    if (!line.trim()) {
-      continue;
-    }
-
-    // Check if line already has a line number
-    const match = line.match(/^(\d+)\s+/);
-    if (match) {
-      const oldLineNum = match[1];
-      lineNumberMap.set(oldLineNum, lineNum.toString());
-    }
-    
-    lineNum += 10;
-  }
-
-  connection.console.log(`[renumber] Mapped ${lineNumberMap.size} existing line numbers for ${document.uri}`);
-
-  // Now apply the renumbering with GOTO/GOSUB target updates
-  lineNum = 10;
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    
-    // Skip empty lines
-    if (!line.trim()) {
-      continue;
-    }
-
-    // Check if line already has a line number
-    const match = line.match(/^(\d+)\s+/);
-    let newLine = line;
-    
-    if (match) {
-      const oldLineNum = match[1];
-      
-      // Only update if line number doesn't match expected
-      if (oldLineNum !== lineNum.toString()) {
-        // Replace line number
-        newLine = line.replace(/^\d+\s+/, `${lineNum} `);
-      }
-    } else {
-      // Add line number to lines without one
-      newLine = `${lineNum} ${line}`;
-    }
-
-    // Now update GOTO/GOSUB targets in this line
-    for (const [oldNum, newNum] of lineNumberMap.entries()) {
-      // Match GOTO or GOSUB followed by the line number (with word boundaries and spaces)
-      const goSubPattern = new RegExp(`\\b(GOTO|GO\\s+TO|GOSUB|GO\\s+SUB)\\s+${oldNum}\\b`, 'gi');
-      newLine = newLine.replace(goSubPattern, (match, keyword) => {
-        // Preserve the keyword format (GOTO vs GO TO)
-        if (keyword.toUpperCase() === 'GOTO' || keyword.toUpperCase().replace(/\s+/g, '') === 'GOTO') {
-          return `GOTO ${newNum}`;
-        } else {
-          return `GOSUB ${newNum}`;
-        }
-      });
-    }
-    
-    // Only add edit if content changed
-    if (newLine !== line) {
-      touchedLines.add(i);
-      edits.push({
-        range: {
-          start: { line: i, character: 0 },
-          end: { line: i, character: line.length }
-        },
-        newText: newLine
-      });
-    }
-    
-    lineNum += 10;
-  }
-
-  connection.console.log(`[renumber] Produced ${edits.length} renumber edits for ${document.uri}`);
-  return { edits, touchedLines };
-}
 
 // Semantic tokens provider for syntax highlighting
 connection.languages.semanticTokens.on(async (params: SemanticTokensParams): Promise<SemanticTokens> => {

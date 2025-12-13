@@ -1,4 +1,6 @@
 // ZX Spectrum BASIC keywords and tokens
+// Note: Two-word keywords GO TO, GO SUB, DEF FN, INPUT LINE are handled specially by the tokenizer
+// Operators AND, OR, NOT are not keywords and have dedicated TokenTypes
 
 export const basicKeywords: string[] = [
   // Standard keywords
@@ -15,8 +17,6 @@ export const basicKeywords: string[] = [
   'STOP',
   'NEXT',
   'POKE',
-  'PEEK',
-  'COLOR',
   'FOR',
   'TO',
   'STEP',
@@ -33,7 +33,6 @@ export const basicKeywords: string[] = [
   'BORDER',
   'CONTINUE',
   'RANDOMIZE',
-  'USR',
   'INK',
   'PAPER',
   'FLASH',
@@ -45,15 +44,10 @@ export const basicKeywords: string[] = [
   'PLOT',
   'DRAW',
   'CIRCLE',
-  'LINE',
-  'CLS',
   'PAUSE',
   'VERIFY',
   'MERGE',
-  'SCREEN$',
-  'ATTR',
-  'POINT',
-  'STROKE'
+  'AT'
 ];
 
 // ZX Spectrum 128K specific keywords
@@ -72,6 +66,9 @@ export const zx128Keywords: string[] = [
 // ZX Interface 1 keywords
 export const interface1Keywords: string[] = [
   'NET',
+  'NET*',
+  'OPEN',
+  'CLOSE',
   'CAT*',
   'LOAD*',
   'SAVE*',
@@ -80,35 +77,44 @@ export const interface1Keywords: string[] = [
   'FORMAT*'
 ];
 
-// Functions
+// Functions (including built-in functions and operators with dedicated TokenTypes)
 export const functions: string[] = [
   'ABS',
   'ACS',
   'ASN',
   'ATN',
+  'ATTR',
   'CHR$',
+  'CODE',
   'COS',
   'EXP',
+  'FN',
+  'IN',
   'INKEY$',
   'INT',
   'LEN',
   'LN',
-  'NOT',
+  'PEEK',
+  'PI',
+  'POINT',
+  'RND',
+  'SCREEN$',
+  'SGN',
   'SIN',
   'SQR',
   'STR$',
-  'TAN',
-  'VAL',
-  'CODE',
-  'IN',
-  'PEEK',
-  'RND',
   'TAB',
+  'TAN',
   'USR',
-  'VAL$',
-  'SGN',
-  'PI',
-  'FN'
+  'VAL',
+  'VAL$'
+];
+
+// Operators (have dedicated TokenTypes, not keywords)
+export const operators: string[] = [
+  'AND',
+  'OR',
+  'NOT'
 ];
 
 // All keywords combined
