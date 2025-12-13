@@ -376,6 +376,32 @@ async function validateTextDocument(textDocument: TextDocument): Promise<Diagnos
     }
   });
 
+  // Check for lines without line numbers (must start with line number or be empty/comment)
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    
+    // Skip empty lines
+    if (!trimmed) {
+      continue;
+    }
+    
+    // Check if line starts with a digit (line number)
+    if (!/^\d+/.test(trimmed)) {
+      // This is an error - non-empty line without line number
+      diagnostics.push({
+        severity: DiagnosticSeverity.Error,
+        range: {
+          start: { line: i, character: 0 },
+          end: { line: i, character: Math.min(trimmed.length, 80) }
+        },
+        message: `Line must start with a line number (1-9999). ZX BASIC does not support multi-line statements.`,
+        source: 'zx-basic-lsp'
+      });
+    }
+  }
+
   // Check for FOR/NEXT matching with variable tracking
   const forStack: Array<{ line: number; start: number; end: number; variable: string; tokenIndex: number }> = [];
   const unmatchedNextStatements: Array<{ line: number; start: number; end: number; variable: string | null }> = [];

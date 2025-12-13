@@ -31,7 +31,15 @@ Legend: `[x]` = Done, `[ ]` = To Do, `[ ] (WIP)` = In Progress.
 - [x] Signature Help — Command signatures exposed through `onSignatureHelp`.
 - [x] Code Actions — Quick fixes/refactors registered via `onCodeAction`.
 - [x] Code Lens — Inline line-number reference counters powered by Code Lens.
-- [x] Diagnostics — Extensive validation produced in `validateTextDocument`.
+- [x] Diagnostics — Extensive validation produced in `validateTextDocument`:
+  - Line number validation (1-9999, must be integers)
+  - Duplicate line number detection
+  - **Missing line number detection** - Catches lines without line numbers that cause TZX conversion errors
+  - FOR/NEXT matching with variable tracking
+  - IF/THEN validation
+  - Type checking (string vs numeric operations)
+  - Color value validation
+  - Array dimension validation
 - [x] Semantic Tokens — Rich highlighting via `onSemanticTokens`.
 
 ### Formatting & Refactoring

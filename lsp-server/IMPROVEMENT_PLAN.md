@@ -147,6 +147,7 @@ Functions in `syntax-definitions/keywords.ts` not in LSP:
 #### 1.4 Improve Diagnostics
 - [x] Validate line numbers (1-9999, integer only)
 - [x] Detect duplicate line numbers
+- [x] Detect lines without line numbers (prevents TZX conversion errors)
 - [x] Warn on missing NEXT for FOR loops (basic check)
 - [x] Warn on RETURN without GOSUB (basic check)
 - [x] Validate array dimensions match DIM declaration (max 3 dimensions per ZX BASIC spec)
