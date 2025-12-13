@@ -5,8 +5,9 @@ This vs code extension is a complete environment to support development of progr
 ## Features
 
  - Complete ZX Spectrum basic support in vs code with a LSP server
- - Converter fro mtext file to ZX spectrum basic
+ - Converter from text file to ZX spectrum basic
  - RS232 transfer utility
+ - **Save as TZX** - Convert BASIC programs to TZX tape format for use with emulators and tape preservation tools
 
 ## LSP Feature Roadmap
 
