@@ -3203,32 +3203,6 @@ connection.languages.semanticTokens.on(async (params: SemanticTokensParams): Pro
   
   // First pass: collect defined items
   for (const token of tokens) {
-    // Handle numeric literals as well (line numbers or numeric literals)
-    if (token.type === TokenType.NUMBER) {
-      // Decide classification: if at line start -> skip (let TextMate handle); if preceded by GOTO/GOSUB etc -> gotoTarget; else skip
-      const tokenIdx = tokens.indexOf(token);
-
-      // If token is the first significant token on its line, skip it (it's a line number, let TextMate handle it)
-      const hasEarlierOnLine = tokens.some(t2 => t2.line === token.line && t2.start < token.start && t2.type !== TokenType.EOF);
-      if (!hasEarlierOnLine) {
-        // Skip line numbers - let TextMate grammar handle them
-        continue;
-      }
-      
-      // Check if it's a GOTO/GOSUB target
-      if (tokenIdx > 0) {
-        const prev = tokens[tokenIdx - 1];
-        if (prev && prev.line === token.line && prev.type === TokenType.KEYWORD && ['GOTO', 'GOSUB', 'RUN', 'LIST', 'RESTORE'].includes(prev.value)) {
-          const tokenType = SEMANTIC.GOTO_TARGET; // gotoTarget
-          const deltaLine = token.line - lastLine;
-          const deltaChar = deltaLine === 0 ? token.start - lastChar : token.start;
-          data.push(deltaLine, deltaChar, token.value.length, tokenType, 0);
-          lastLine = token.line;
-          lastChar = token.start + token.value.length;
-        }
-      }
-      continue;
-    }
     if (token.type === TokenType.LINE_NUMBER) {
       definedLineNumbers.add(token.value);
     } else if (token.type === TokenType.KEYWORD && token.value.toUpperCase() === 'LET') {
@@ -3264,6 +3238,11 @@ connection.languages.semanticTokens.on(async (params: SemanticTokensParams): Pro
 
   // Generate semantic tokens
   for (const token of tokens) {
+    // Skip all NUMBER tokens - let TextMate grammar handle numeric literals consistently
+    if (token.type === TokenType.NUMBER) {
+      continue;
+    }
+    
     if (token.type === TokenType.LINE_NUMBER) {
       // Skip line numbers - let TextMate grammar handle them for consistent coloring
       continue;
@@ -3384,30 +3363,11 @@ connection.languages.semanticTokens.onRange(async (params: SemanticTokensRangePa
       continue;
     }
 
-    // Handle numeric literals in range as well
+    // Skip all NUMBER tokens - let TextMate grammar handle numeric literals consistently
     if (token.type === TokenType.NUMBER) {
-      const tokenIdx = tokens.indexOf(token);
-
-      const hasEarlierOnLine = tokens.some(t2 => t2.line === token.line && t2.start < token.start && t2.type !== TokenType.EOF);
-      if (!hasEarlierOnLine) {
-        // Skip line numbers - let TextMate grammar handle them
-        continue;
-      }
-      
-      // Check if it's a GOTO/GOSUB target
-      if (tokenIdx > 0) {
-        const prev = tokens[tokenIdx - 1];
-        if (prev && prev.line === token.line && prev.type === TokenType.KEYWORD && ['GOTO', 'GOSUB', 'RUN', 'LIST', 'RESTORE'].includes(prev.value)) {
-          const tokenType = SEMANTIC.GOTO_TARGET;
-          const deltaLine = token.line - lastLine;
-          const deltaChar = deltaLine === 0 ? token.start - lastChar : token.start;
-          data.push(deltaLine, deltaChar, token.value.length, tokenType, 0);
-          lastLine = token.line;
-          lastChar = token.start + token.value.length;
-        }
-      }
       continue;
     }
+    
     if (token.type === TokenType.LINE_NUMBER) {
       // Skip line numbers - let TextMate grammar handle them for consistent coloring
       continue;

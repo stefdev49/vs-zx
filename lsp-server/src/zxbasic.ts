@@ -453,17 +453,16 @@ export class ZXBasicLexer {
     // ZX BASIC keywords (based on ROM disassembly)
     const keywords = [
       'PRINT', 'LET', 'IF', 'THEN', 'ELSE', 'FOR', 'TO', 'STEP', 'NEXT',
-      'WHILE', 'WEND', 'REPEAT', 'UNTIL', 'READ', 'DATA', 'RESTORE', 'DIM',
+      'READ', 'DATA', 'RESTORE', 'DIM',
       'DEF', 'FN', 'DEFFN', 'GOTO', 'GOSUB', 'RETURN', 'STOP', 'RANDOMIZE', 'CONTINUE',
       'CLEAR', 'CLS', 'INPUT', 'LOAD', 'SAVE', 'VERIFY', 'MERGE', 'BEEP',
       'INK', 'PAPER', 'FLASH', 'BRIGHT', 'INVERSE', 'OVER', 'BORDER', 'PLOT',
       'DRAW', 'CIRCLE', 'LPRINT', 'LLIST', 'COPY', 'SPECTRUM', 'PLAY', 'ERASE',
-      'CAT', 'FORMAT', 'MOVE', 'VAL', 'LEN', 'STR$', 'CHR$', 'CODE', 'SIN',
+      'CAT', 'FORMAT', 'MOVE', 'OUT', 'IN', 'OPEN', 'CLOSE', 'POKE', 'RUN', 'LIST', 'NEW', 'END', 'PAUSE',
+      'VAL', 'LEN', 'STR$', 'CHR$', 'CODE', 'SIN',
       'COS', 'TAN', 'ASN', 'ACS', 'ATN', 'LN', 'EXP', 'INT', 'SQR', 'SGN',
       'ABS', 'PEEK', 'USR', 'INKEY$', 'PI', 'TRUE', 'FALSE', 'RND', 'ATTR',
-      'SCREEN$', 'POINT', 'TAB', 'AND', 'OR', 'NOT', 'VAL$', 'CHR$', 'SCREEN$',
-      'ATTR', 'POINT', 'TAB', 'AT', 'STEP', 'OVER', 'INVERSE', 'BRIGHT', 'FLASH',
-      'INK', 'PAPER', 'CIRCLE', 'DRAW', 'LPRINT', 'LLIST'
+      'SCREEN$', 'POINT', 'TAB', 'AND', 'OR', 'NOT', 'VAL$', 'AT'
     ];
 
     if (keywords.includes(value)) {
