@@ -66,3 +66,15 @@ ZX DTR input (pin 4) ← PC DB9 pin 4 (DTR) ⟵ gives Spectrum the “ready” s
 ZX CTS output (pin 5) → PC DB9 pin 8 (CTS) ⟵ lets PC see Spectrum’s CTS
 ZX GND (pin 7) → PC DB9 pin 5 (GND)
 ZX 9V (pin 9) → PC DB9 pin 6 (DSR) — typically unused by the PC side
+
+## REPAIR
+
+```log
+Likely failure points on the DTR drive/sense chain (net labeled DTR_ feeding the DB9):
+
+Transistor stages that level-shift DTR: the PNP/NPN pair near the connector (Q5 BC213C and Q6 BC184C) and their bias resistors (R14 1k, R15 12k, R16 3k9, R18 680R, R20 2k7, C7 330p). If either transistor is open/short or any of those resistors are cracked, the line will stay low and IN returns 30.
+The pull network on DTR input side: R28 6k8, R29 6k8, R25 10k, R24 4k7—if these are open/short, the interface might never see a high.
+Clamp diodes on the low-voltage side (D6, D7 BZX79C4V3): if shorted, they’ll pin the signal; if open, they’re less likely to kill it but could allow overvoltage damage upstream.
+Edge/connectors: continuity from the Spectrum edge to the DTR_ net and then to the DB9 pin; oxidized edge fingers or cracked traces will mimic a stuck-low DTR.
+Rails: the stage needs +12 V/-12 V present; missing ±12 or +5 at this section will keep the output inactive. Verify supply at R14/R16 nodes (+12) and at the emitter of Q5 (+12) and Q4/Q3 path for -12.
+```

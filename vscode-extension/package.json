@@ -2,7 +2,7 @@
   "name": "zx-basic-vscode-extension",
   "repository": "git+https://github.com/stef/vs-zx.git",
   "displayName": "ZX BASIC Development Environment",
-  "version": "1.0.107",
+  "version": "1.0.109",
   "description": "VS Code extension for ZX Spectrum BASIC development with Interface 1 transfer",
   "license": "MIT",
   "engines": {
@@ -57,6 +57,16 @@
         "title": "Stop ZX Playback",
         "category": "ZX BASIC",
         "icon": "$(debug-stop)"
+      },
+      {
+        "command": "zx-basic.extractVariable",
+        "title": "Extract Variable",
+        "category": "ZX BASIC Refactoring"
+      },
+      {
+        "command": "zx-basic.renumberLines",
+        "title": "Renumber Lines",
+        "category": "ZX BASIC Refactoring"
       }
     ],
     "menus": {
@@ -88,6 +98,16 @@
           "command": "zx-basic.playToZx",
           "when": "editorLangId == zx-basic",
           "group": "1_modification"
+        },
+        {
+          "command": "zx-basic.extractVariable",
+          "when": "editorLangId == zx-basic",
+          "group": "2_refactoring"
+        },
+        {
+          "command": "zx-basic.renumberLines",
+          "when": "editorLangId == zx-basic",
+          "group": "2_refactoring"
         }
       ],
       "editor/context": [
@@ -100,6 +120,16 @@
           "command": "zx-basic.playToZx",
           "when": "editorLangId == zx-basic",
           "group": "1_modification"
+        },
+        {
+          "command": "zx-basic.extractVariable",
+          "when": "editorLangId == zx-basic",
+          "group": "2_refactoring"
+        },
+        {
+          "command": "zx-basic.renumberLines",
+          "when": "editorLangId == zx-basic",
+          "group": "2_refactoring"
         }
       ]
     },

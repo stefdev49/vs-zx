@@ -4,6 +4,7 @@
 7 REM be functioning and the voltage levels between the ULA and the RS232 Socket Should be checked.
 10 OUT 239,255: OUT 247,1
 20 IF IN 247<128 THEN GO TO 99
+25 PRINT "PASS 0; ";
 30 OUT 247, 0
 40 IF IN 247>127 THEN GO TO 90
 50 PRINT "PASS 1; ";

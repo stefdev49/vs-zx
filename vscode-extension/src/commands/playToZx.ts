@@ -222,7 +222,7 @@ async function playToZx() {
       
       if (err.message.includes('ENOENT')) {
         window.showErrorMessage(
-          `tzxplay not found. Please install tzxplay or configure the path in settings.`,
+          'tzxplay not found. Please install tzxplay or configure the path in settings.',
           'Open Settings'
         ).then(choice => {
           if (choice === 'Open Settings') {
