@@ -20,6 +20,16 @@ export {
   verifyTapChecksums
 } from './tap-format';
 
+export {
+  convertTapToTzx,
+  convertTzxToTap,
+  parseTzxFile,
+  getTzxMetadata,
+  createTzxWithDescription,
+  TzxBlock,
+  TzxMetadata
+} from './tzx-format';
+
 export const VERSION = '1.0.0';
 
 export interface ProgramMetadata {
@@ -69,6 +79,23 @@ export function convertBasicToTap(
   autostart?: number
 ): Buffer {
   return convertToTap(basicCode, { name: programName, autostart });
+}
+
+export function convertBasicToTzx(
+  basicCode: string,
+  programName = 'Program',
+  autostart?: number,
+  description?: string
+): Buffer {
+  const tapBuffer = convertToTap(basicCode, { name: programName, autostart });
+  
+  if (description) {
+    const { createTzxWithDescription } = require('./tzx-format');
+    return createTzxWithDescription(tapBuffer, description);
+  }
+  
+  const { convertTapToTzx } = require('./tzx-format');
+  return convertTapToTzx(tapBuffer);
 }
 
 export function initialize(): {

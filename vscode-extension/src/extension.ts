@@ -179,6 +179,10 @@ export function activate(context: ExtensionContext) {
 	// Register command for transfer (use source so bundler can include it)
 	const transferCmd = require('./commands/transfer');
 	context.subscriptions.push(transferCmd.register());
+
+	// Register command for save as TZX
+	const saveAsTzxCmd = require('./commands/saveAsTzx');
+	context.subscriptions.push(saveAsTzxCmd.register());
 }
 
 export function deactivate(): Thenable<void> | undefined {

@@ -40,12 +40,21 @@
         "command": "zx-basic.transfer",
         "title": "Transfer to ZX Spectrum",
         "category": "ZX BASIC"
+      },
+      {
+        "command": "zx-basic.saveAsTzx",
+        "title": "Save as TZX",
+        "category": "ZX BASIC"
       }
     ],
     "menus": {
       "commandPalette": [
         {
           "command": "zx-basic.transfer",
+          "when": "editorLangId == zx-basic"
+        },
+        {
+          "command": "zx-basic.saveAsTzx",
           "when": "editorLangId == zx-basic"
         }
       ],
@@ -55,6 +64,13 @@
           "alt": "zx-basic.transfer",
           "when": "editorLangId == zx-basic",
           "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "zx-basic.saveAsTzx",
+          "when": "editorLangId == zx-basic",
+          "group": "1_modification"
         }
       ]
     },
@@ -123,7 +139,8 @@
   },
   "activationEvents": [
     "onLanguage:zx-basic",
-    "onCommand:zx-basic.transfer"
+    "onCommand:zx-basic.transfer",
+    "onCommand:zx-basic.saveAsTzx"
   ],
   "main": "./out/extension.js",
   "scripts": {
