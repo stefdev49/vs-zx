@@ -19,6 +19,12 @@
       "include": "#functions"
     },
     {
+      "include": "#goto-gosub-targets"
+    },
+    {
+      "include": "#for-next-loops"
+    },
+    {
       "include": "#operators"
     },
     {
@@ -81,6 +87,40 @@
         {
           "match": "\\b(ABS|ACS|ASN|ATN|ATTR|CHR\\$|CODE|COS|EXP|FN|IN|INKEY\\$|INT|LEN|LN|PEEK|PI|POINT|RND|SCREEN\\$|SGN|SIN|SQR|STR\\$|TAB|TAN|USR|VAL|VAL\\$)\\b",
           "name": "support.function.zx-basic"
+        }
+      ]
+    },
+    "goto-gosub-targets": {
+      "patterns": [
+        {
+          "match": "\\b(GOTO|GOSUB|GO TO|GO SUB)\\s+(\\d+)",
+          "captures": {
+            "1": { "name": "keyword.control.goto-gosub.zx-basic" },
+            "2": { "name": "constant.numeric.goto-target.zx-basic" }
+          }
+        }
+      ]
+    },
+    "for-next-loops": {
+      "patterns": [
+        {
+          "match": "\\b(FOR)\\s+(\\w+)\\s*=\\s*([^\\n]+)\\s+(TO)\\s+([^\\n]+)(?:\\s+(STEP)\\s+([^\\n]+))?",
+          "captures": {
+            "1": { "name": "keyword.control.for.zx-basic" },
+            "2": { "name": "variable.other.for-loop.zx-basic" },
+            "3": { "name": "meta.for-initial.zx-basic" },
+            "4": { "name": "keyword.control.to.zx-basic" },
+            "5": { "name": "meta.for-final.zx-basic" },
+            "6": { "name": "keyword.control.step.zx-basic" },
+            "7": { "name": "meta.for-step.zx-basic" }
+          }
+        },
+        {
+          "match": "\\b(NEXT)\\s+(\\w+)",
+          "captures": {
+            "1": { "name": "keyword.control.next.zx-basic" },
+            "2": { "name": "variable.other.for-loop.zx-basic" }
+          }
         }
       ]
     },
