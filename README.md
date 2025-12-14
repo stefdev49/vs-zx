@@ -4,17 +4,20 @@ This vs code extension is a complete environment to support development of progr
 
 ## Features
 
- - Complete ZX Spectrum basic support in vs code with a LSP server
- - Converter from text file to ZX spectrum basic
- - RS232 transfer utility
- - **Save as TZX** - Convert BASIC programs to TZX tape format for use with emulators and tape preservation tools
- - **Play to ZX Spectrum** - Convert and play BASIC programs directly through audio using tzxplay, no file writing needed
+- Complete ZX Spectrum BASIC support in VS Code with a LSP server
+- Converter from text file to ZX Spectrum BASIC
+- RS232 transfer utility
+- **Save as TZX** - Convert BASIC programs to TZX tape format for use with emulators and tape preservation tools
+- **Play to ZX Spectrum** - Convert and play BASIC programs directly through audio using tzxplay, no file writing needed
+- **Advanced Refactoring** - Extract variables, extract subroutines, and other code transformations
+- **Code Formatting** - Automatic line numbering, keyword uppercasing, and code cleanup
 
 ## LSP Feature Roadmap
 
 Legend: `[x]` = Done, `[ ]` = To Do, `[ ] (WIP)` = In Progress.
 
 ### Core Navigation
+
 - [x] Document Symbols — Outline provider implemented in `lsp-server/src/server.ts`.
 - [ ] Workspace Symbols — Not yet implemented.
 - [x] Hover — Hover responses wired via `connection.onHover`.
@@ -27,10 +30,14 @@ Legend: `[x]` = Done, `[ ]` = To Do, `[ ] (WIP)` = In Progress.
 - [ ] Document Links — Not yet implemented.
 
 ### Code Intelligence
+
 - [x] Completion — Keyword/variable completion plus snippets handled in `onCompletion`.
 - [x] Completion Resolve — Additional detail provided in `onCompletionResolve`.
 - [x] Signature Help — Command signatures exposed through `onSignatureHelp`.
-- [x] Code Actions — Quick fixes/refactors registered via `onCodeAction`.
+- [x] Code Actions — Quick fixes/refactors registered via `onCodeAction`:
+  - Extract Variable: Extract expressions to variables with proper line numbering
+  - Extract Subroutine: Move code blocks to subroutines at end of program
+  - Add/renumber line numbers, insert missing RETURN/NEXT, suggest DIM, uppercase keywords.
 - [x] Code Lens — Inline line-number reference counters powered by Code Lens.
 - [x] Diagnostics — Extensive validation produced in `validateTextDocument`:
   - Line number validation (1-9999, must be integers)
@@ -44,14 +51,16 @@ Legend: `[x]` = Done, `[ ]` = To Do, `[ ] (WIP)` = In Progress.
 - [x] Semantic Tokens — Rich highlighting via `onSemanticTokens`.
 
 ### Formatting & Refactoring
+
 - [x] Formatting — Whole-document formatting available through `onDocumentFormatting`.
 - [ ] Range Formatting — Not yet implemented.
 - [ ] On Type Formatting — Not yet implemented.
-- [x] Rename — Variable and line-number rename supported in `onRenameRequest`.
+- [x] Rename — Variable and line-number rename supported in `onRenameRequest` with proper refactoring.
 - [x] Prepare Rename — Validation handler ensures rename targets exist before edits.
 - [ ] Selection Range — Not yet implemented.
 
 ### Advanced Analysis
+
 - [x] Folding Ranges — Provided through `onFoldingRanges`.
 - [x] Call Hierarchy — Incoming/outgoing GOSUB calls supported.
 - [ ] Inlay Hints — Not yet implemented.
@@ -59,6 +68,7 @@ Legend: `[x]` = Done, `[ ]` = To Do, `[ ] (WIP)` = In Progress.
 - [ ] Moniker/Indexing — Not yet implemented.
 
 ### Workspace & Infrastructure
+
 - [ ] Execute Command — Not yet implemented.
 - [ ] Workspace File Watching — Not yet implemented.
 - [ ] Workspace Folders — Not yet implemented.
@@ -66,9 +76,9 @@ Legend: `[x]` = Done, `[ ]` = To Do, `[ ] (WIP)` = In Progress.
 - [ ] Progress Reporting — Not yet implemented.
 
 ### UI & Communication
+
 - [x] Window & Logging APIs — Initialization and settings changes notify via `connection.window.showInformationMessage`.
 - [ ] Experimental/Custom Requests — Not yet implemented.
-
 
 ## Audio Playback Feature
 
@@ -95,12 +105,73 @@ pip install tzxtools
 ### Configuration
 
 - `zxBasic.tzxplay.path` - Path to tzxplay executable (default: "tzxplay")
-- `zxBasic.tzxplay.mode48k` - Enable ZX Spectrum 48K mode (default: false)  
+- `zxBasic.tzxplay.mode48k` - Enable ZX Spectrum 48K mode (default: false)
 - `zxBasic.tzxplay.sine` - Generate soft sine pulses instead of square pulses (default: false)
+
+## Refactoring Features
+
+The extension includes powerful refactoring capabilities to help modernize and organize ZX BASIC code.
+
+### Extract Variable
+
+Extract expressions to variables with proper line numbering and formatting:
+
+**Before:**
+
+```basic
+10 PRINT 4*2+10
+```
+
+**After (select `4*2+10` and extract variable):**
+
+```basic
+10 LET RESULT = 4 * 2 + 10
+20 PRINT RESULT
+```
+
+### Extract to Subroutine
+
+Move code blocks to subroutines at the end of the program:
+
+**Before:**
+
+```basic
+10 REM Main program
+20 LET X = 5
+30 LET Y = 10
+40 PRINT "Calculating result..."
+50 LET RESULT = X * Y + 15  ← Select these lines
+60 PRINT "Result is:"; RESULT
+70 END
+```
+
+**After (select lines 50-60 and extract to subroutine):**
+
+```basic
+10 REM Main program
+20 LET X = 5
+30 LET Y = 10
+40 PRINT "Calculating result..."
+50 GOSUB 1000  ← Original code replaced with GOSUB call
+70 END
+
+1000 REM Subroutine SUB1  ← Extracted code moved to end
+1010 LET RESULT = X * Y + 15
+1020 PRINT "Result is:"; RESULT
+1030 RETURN
+```
+
+### Usage
+
+1. **Select** the code you want to refactor
+2. **Right-click** and choose from the Refactor... submenu
+3. **Or** use the command palette (Ctrl+Shift+P) and search for refactoring commands
+4. The extension handles all line numbering, spacing, and code organization automatically
 
 ### Progress Monitoring
 
 The **ZX Spectrum Playback** output channel shows real-time progress including:
+
 - TZX size and program details
 - Block-by-block playback status
 - Completion or error messages
