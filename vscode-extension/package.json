@@ -2,7 +2,7 @@
   "name": "zx-basic-vscode-extension",
   "repository": "git+https://github.com/stef/vs-zx.git",
   "displayName": "ZX BASIC Development Environment",
-  "version": "1.0.126",
+  "version": "1.0.135",
   "description": "VS Code extension for ZX Spectrum BASIC development with Interface 1 transfer",
   "license": "MIT",
   "engines": {
@@ -193,6 +193,11 @@
             "type": "boolean",
             "default": true,
             "description": "Auto-uppercase keywords on completion and formatting"
+          },
+          "zxBasic.enableFormatOnType": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable immediate keyword uppercasing as you type (when space/enter is pressed)"
           },
           "zxBasic.trace.server": {
             "type": "string",

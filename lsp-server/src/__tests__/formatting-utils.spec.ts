@@ -1,5 +1,6 @@
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { autoRenumberLines } from '../formatting-utils';
+import { autoRenumberLines, formatLine } from '../formatting-utils';
+import { ZXBasicLexer, TokenType } from '../zxbasic';
 
 function createDocument(contents: string): TextDocument {
   return TextDocument.create('file:///test.bas', 'zx-basic', 1, contents);
@@ -36,5 +37,44 @@ describe('autoRenumberLines', () => {
 
     expect(firstLine?.newText).toBe('10 PRINT "NO NUM"');
     expect(secondLine?.newText).toBe('20 GOTO 20');
+  });
+});
+
+describe('formatLine', () => {
+  const lexer = new ZXBasicLexer();
+
+  it('should uppercase REM keywords in comments', () => {
+    const doc = createDocument('10 rem test comment');
+    const tokens = lexer.tokenize('10 rem test comment').filter(t => t.type !== TokenType.EOF);
+    const result = formatLine(tokens, doc);
+    
+    expect(result).not.toBeNull();
+    expect(result?.newText).toBe('10 REM test comment');
+  });
+
+  it('should preserve already uppercase REM keywords', () => {
+    const doc = createDocument('20 REM TEST COMMENT');
+    const tokens = lexer.tokenize('20 REM TEST COMMENT').filter(t => t.type !== TokenType.EOF);
+    const result = formatLine(tokens, doc);
+    
+    expect(result).toBeNull(); // No changes needed
+  });
+
+  it('should handle mixed case REM keywords', () => {
+    const doc = createDocument('30 Rem Mixed Case');
+    const tokens = lexer.tokenize('30 Rem Mixed Case').filter(t => t.type !== TokenType.EOF);
+    const result = formatLine(tokens, doc);
+    
+    expect(result).not.toBeNull();
+    expect(result?.newText).toBe('30 REM Mixed Case');
+  });
+
+  it('should uppercase regular keywords', () => {
+    const doc = createDocument('40 print "hello"');
+    const tokens = lexer.tokenize('40 print "hello"').filter(t => t.type !== TokenType.EOF);
+    const result = formatLine(tokens, doc);
+    
+    expect(result).not.toBeNull();
+    expect(result?.newText).toBe('40 PRINT "hello"');
   });
 });

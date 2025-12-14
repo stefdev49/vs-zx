@@ -1,8 +1,11 @@
 # VS Code ZX BASIC Extension
 
-This vs code extension is a complete environment to support development of programs for ZX Spectrum 2+ or ZX Spectrum 48K with ZX Interface 1. The coding takes place in vs code on a linux pc, then program is transfered on real hardware using RS232.
+This vs code extension is a complete environment to support development of programs for ZX Spectrum 2+ or ZX Spectrum 48K with ZX Interface 1. The coding takes place in vs code on a linux pc, then program is transfered on real hardware.
+
+It is currently in **beta**. Only pure basic programs are supported.
 
 ## Features
+
 Legend: `[x]` = Done, `[ ]` = To Do, `[ ] (WIP)` = In Progress.
 
 - [x] Complete ZX Spectrum BASIC support in VS Code with a LSP server
@@ -10,6 +13,7 @@ Legend: `[x]` = Done, `[ ]` = To Do, `[ ] (WIP)` = In Progress.
 - [x] (WIP) **RS232** transfer utility
 - [x] **Save as TZX** - Convert BASIC programs to TZX tape format for use with emulators and tape preservation tools
 - [x] **Play to ZX Spectrum** - Convert and play BASIC programs directly through audio using tzxplay, no file writing needed
+- [ ] **Record from ZX Spectrum** - Convert BASIC programs directly from ZX Spectrum audio using tzxwav and audio recording, no file writing needed
 - [x] **Advanced Refactoring** - Extract variables, extract subroutines, and other code transformations
 - [x] **Code Formatting** - Automatic line numbering, keyword uppercasing, and code cleanup
 - [ ] **Save to mdv** - Convert BASIC programs to MDV format

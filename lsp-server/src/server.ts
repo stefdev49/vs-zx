@@ -32,6 +32,7 @@ import {
   CodeLensParams,
   TextEdit,
   DocumentFormattingParams,
+  DocumentOnTypeFormattingParams,
   SemanticTokensParams,
   SemanticTokens,
   SemanticTokensLegend,
@@ -73,7 +74,13 @@ import {
   buildLineReferenceMap,
 } from "./line-number-utils";
 import { findIdentifierReferenceRanges } from "./identifier-utils";
-import { autoRenumberLines, formatLine } from "./formatting-utils";
+import {
+  autoRenumberLines,
+  formatLine,
+  getWordBeforePosition,
+  checkKeywordContext,
+  findLastKeywordOnLine,
+} from "./formatting-utils";
 
 // Snippet completions for common patterns
 const snippets = [
@@ -245,7 +252,18 @@ function getDocumentSettings(resource: string): Thenable<ExampleSettings> {
   return documentSettings.get(resource)!;
 }
 
+let enableFormatOnType = true;
+
 connection.onInitialize((params: InitializeParams) => {
+  // Store initialization options
+  if (
+    params.initializationOptions &&
+    typeof params.initializationOptions === "object"
+  ) {
+    enableFormatOnType =
+      params.initializationOptions.enableFormatOnType !== false;
+  }
+
   const capabilities = params.capabilities;
 
   return {
@@ -277,6 +295,10 @@ connection.onInitialize((params: InitializeParams) => {
         resolveProvider: false,
       },
       documentFormattingProvider: true,
+      documentOnTypeFormattingProvider: {
+        firstTriggerCharacter: " ",
+        moreTriggerCharacter: ["\n"],
+      },
       semanticTokensProvider: {
         legend: semanticTokensLegend,
         full: true,
@@ -1289,10 +1311,12 @@ connection.onCompletion(
     const text = document.getText();
 
     // Get the current line and position
-    const lineText = document.getText({
-      start: { line: position.line, character: 0 },
-      end: { line: position.line, character: position.character },
-    });
+    const lineText = document
+      .getText({
+        start: { line: position.line, character: 0 },
+        end: { line: position.line + 1, character: 0 },
+      })
+      .replace(/\n$/, "");
 
     // Find the current word being typed - extract from the last word boundary
     let currentWord = "";
@@ -2561,7 +2585,8 @@ function analyzeVariableUsage(
           context = "FOR";
         }
 
-        const basicLine = fileLineToBasicLine.get(token.line) || String(token.line + 1);
+        const basicLine =
+          fileLineToBasicLine.get(token.line) || String(token.line + 1);
 
         if (isDeclaration) {
           hasDeclaration = true;
@@ -2592,7 +2617,7 @@ function analyzeVariableUsage(
   let hoverInfo = `**${variableName}**\n\n`;
 
   // Find declaration occurrence for linking
-  const declOcc = occurrences.find(o => o.isDeclaration);
+  const declOcc = occurrences.find((o) => o.isDeclaration);
   if (hasDeclaration && declOcc) {
     const declFileLineNum = declOcc.line + 1;
     hoverInfo += `✅ **Declared** on [line ${declarationBasicLine}](${docUri}#L${declFileLineNum})\n\n`;
@@ -3530,9 +3555,25 @@ connection.onDocumentFormatting(
     for (const token of tokens) {
       if (token.line !== currentLine && currentLine >= 0) {
         // Process previous line
-        if (!touchedLines.has(currentLine)) {
-          const formatted = formatLine(lineTokens, document);
-          if (formatted) {
+        // Always format for keyword uppercasing, even if line was renumbered
+        const formatted = formatLine(lineTokens, document);
+        if (formatted) {
+          // Check if this line was already modified by renumbering
+          const existingEditIndex = edits.findIndex(
+            (edit) =>
+              edit.range.start.line === currentLine &&
+              edit.range.start.character === 0,
+          );
+
+          if (existingEditIndex !== -1) {
+            // Merge with existing renumbering edit
+            const existingEdit = edits[existingEditIndex];
+            edits[existingEditIndex] = {
+              range: existingEdit.range,
+              newText: formatted.newText,
+            };
+          } else {
+            // Add new formatting edit
             edits.push(formatted);
           }
         }
@@ -3545,10 +3586,27 @@ connection.onDocumentFormatting(
     }
 
     // Process last line
-    if (lineTokens.length > 0 && !touchedLines.has(currentLine)) {
+    if (lineTokens.length > 0) {
       const formatted = formatLine(lineTokens, document);
       if (formatted) {
-        edits.push(formatted);
+        // Check if this line was already modified by renumbering
+        const existingEditIndex = edits.findIndex(
+          (edit) =>
+            edit.range.start.line === currentLine &&
+            edit.range.start.character === 0,
+        );
+
+        if (existingEditIndex !== -1) {
+          // Merge with existing renumbering edit
+          const existingEdit = edits[existingEditIndex];
+          edits[existingEditIndex] = {
+            range: existingEdit.range,
+            newText: formatted.newText,
+          };
+        } else {
+          // Add new formatting edit
+          edits.push(formatted);
+        }
       }
     }
 
@@ -3556,6 +3614,122 @@ connection.onDocumentFormatting(
       `[format] Returning ${edits.length} total edits for ${params.textDocument.uri}`,
     );
     return edits;
+  },
+);
+
+// Format-on-type provider for immediate keyword uppercasing
+connection.onDocumentOnTypeFormatting(
+  (params: DocumentOnTypeFormattingParams): TextEdit[] => {
+    connection.console.log(
+      `[format-on-type] Called with char='${params.ch}' at ${params.position.line}:${params.position.character}`,
+    );
+
+    // Check if feature is enabled
+    if (!enableFormatOnType) {
+      connection.console.log(
+        `[format-on-type] Feature disabled, returning empty edits`,
+      );
+      return [];
+    }
+    
+    const document = documents.get(params.textDocument.uri);
+    if (!document) {
+      connection.console.log(
+        `[format-on-type] No document found for ${params.textDocument.uri}`,
+      );
+      return [];
+    }
+
+    // Only trigger on space and enter keys
+    if (params.ch !== " " && params.ch !== "\n") {
+      connection.console.log(
+        `[format-on-type] Ignoring non-trigger character: '${params.ch}'`,
+      );
+      return [];
+    }
+
+    connection.console.log(
+      `[format-on-type] Triggered by '${params.ch}' at ${params.position.line}:${params.position.character}`,
+    );
+
+    const lineText = document
+      .getText({
+        start: { line: params.position.line, character: 0 },
+        end: { line: params.position.line + 1, character: 0 },
+      })
+      .replace(/\n$/, "");
+
+    connection.console.log(
+      `[format-on-type] Line text: "${lineText}"`,
+    );
+
+    const position = params.position;
+    let wordBeforeTrigger = getWordBeforePosition(lineText, position.character);
+
+    connection.console.log(
+      `[format-on-type] Word before trigger: "${wordBeforeTrigger}"`,
+    );
+
+    // For Enter key, find the last keyword on the line
+    if (params.ch === "\n" && !wordBeforeTrigger) {
+      wordBeforeTrigger = findLastKeywordOnLine(lineText);
+      connection.console.log(
+        `[format-on-type] Enter key - found last keyword: "${wordBeforeTrigger}"`,
+      );
+    }
+
+    if (!wordBeforeTrigger) {
+      connection.console.log(
+        `[format-on-type] No keyword found to uppercase`,
+      );
+      return [];
+    }
+
+    // Check if it's a complete keyword in proper context
+    const keywordCheck = checkKeywordContext(
+      wordBeforeTrigger,
+      lineText,
+      position.character,
+    );
+
+    connection.console.log(
+      `[format-on-type] Keyword check result: ${JSON.stringify({
+        isKeyword: keywordCheck.isKeyword,
+        isVariable: keywordCheck.isVariable,
+        keyword: keywordCheck.keyword,
+        start: keywordCheck.start,
+        end: keywordCheck.end,
+      })}`,
+    );
+
+    if (keywordCheck.isKeyword && !keywordCheck.isVariable) {
+      connection.console.log(
+        `[format-on-type] Uppercasing keyword '${keywordCheck.keyword}' at position ${keywordCheck.start}-${keywordCheck.end}`,
+      );
+
+      // Send notification to client for user feedback
+      connection.sendNotification("zxBasic/keywordUppercased", {
+        line: position.line,
+        start: keywordCheck.start,
+        end: keywordCheck.end,
+        keyword: keywordCheck.keyword.toUpperCase(),
+      });
+
+      return [
+        {
+          range: {
+            start: { line: position.line, character: keywordCheck.start },
+            end: { line: position.line, character: keywordCheck.end },
+          },
+          newText: keywordCheck.keyword.toUpperCase(),
+        },
+      ];
+    }
+
+    connection.console.log(
+      `[format-on-type] Not uppercasing (isKeyword=${keywordCheck.isKeyword}, isVariable=${keywordCheck.isVariable})`,
+    );
+    return [];
   },
 );
 
