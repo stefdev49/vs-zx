@@ -25,10 +25,10 @@
       "include": "#for-next-loops"
     },
     {
-      "include": "#operators"
+      "include": "#numbers"
     },
     {
-      "include": "#numbers"
+      "include": "#operators"
     },
     {
       "include": "#variables"
@@ -50,8 +50,12 @@
     "comments": {
       "patterns": [
         {
-          "match": "\\bREM\\b.*$",
-          "name": "comment.line.rem.zx-basic"
+          "begin": "\\bREM\\b",
+          "end": "$",
+          "name": "comment.line.rem.zx-basic",
+          "beginCaptures": {
+            "0": { "name": "keyword.control.rem.zx-basic" }
+          }
         }
       ]
     },

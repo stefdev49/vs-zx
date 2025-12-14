@@ -3672,41 +3672,9 @@ connection.languages.semanticTokens.on(
         );
         lastLine = token.line;
         lastChar = token.start + token.value.length;
-      } else if (token.type === TokenType.KEYWORD) {
-        const tokenType = SEMANTIC.KEYWORD; // keyword
-        const modifier = 0;
-
-        const deltaLine = token.line - lastLine;
-        const deltaChar =
-          deltaLine === 0 ? token.start - lastChar : token.start;
-
-        data.push(
-          deltaLine,
-          deltaChar,
-          token.value.length,
-          tokenType,
-          modifier,
-        );
-        lastLine = token.line;
-        lastChar = token.start + token.value.length;
-      } else if (token.type === TokenType.COMMENT) {
-        const tokenType = SEMANTIC.COMMENT; // comment
-        const modifier = 0;
-
-        const deltaLine = token.line - lastLine;
-        const deltaChar =
-          deltaLine === 0 ? token.start - lastChar : token.start;
-
-        data.push(
-          deltaLine,
-          deltaChar,
-          token.value.length,
-          tokenType,
-          modifier,
-        );
-        lastLine = token.line;
-        lastChar = token.start + token.value.length;
       }
+      // Skip KEYWORD and COMMENT tokens - let TextMate grammar handle them
+      // for consistent highlighting without position calculation issues
     }
 
     return { data };
@@ -3839,41 +3807,8 @@ connection.languages.semanticTokens.onRange(
         );
         lastLine = token.line;
         lastChar = token.start + token.value.length;
-      } else if (token.type === TokenType.KEYWORD) {
-        const tokenType = SEMANTIC.KEYWORD; // keyword
-        const modifier = 0;
-
-        const deltaLine = token.line - lastLine;
-        const deltaChar =
-          deltaLine === 0 ? token.start - lastChar : token.start;
-
-        data.push(
-          deltaLine,
-          deltaChar,
-          token.value.length,
-          tokenType,
-          modifier,
-        );
-        lastLine = token.line;
-        lastChar = token.start + token.value.length;
-      } else if (token.type === TokenType.COMMENT) {
-        const tokenType = SEMANTIC.COMMENT; // comment
-        const modifier = 0;
-
-        const deltaLine = token.line - lastLine;
-        const deltaChar =
-          deltaLine === 0 ? token.start - lastChar : token.start;
-
-        data.push(
-          deltaLine,
-          deltaChar,
-          token.value.length,
-          tokenType,
-          modifier,
-        );
-        lastLine = token.line;
-        lastChar = token.start + token.value.length;
       }
+      // Skip KEYWORD and COMMENT tokens - let TextMate grammar handle them
     }
 
     return { data };
