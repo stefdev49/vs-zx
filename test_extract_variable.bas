@@ -1,0 +1,4 @@
+10 LET X = 4*2+10
+20 PRINT 4*2+10
+30 LET Y = X + 5
+40 PRINT X + 5

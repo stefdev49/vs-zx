@@ -6,6 +6,7 @@ import {
   generateUniqueVariableName,
   inferVariableType,
   isValidExpression,
+  getLineNumberAtPosition,
 } from "./refactorUtils";
 
 export function extractVariable() {
@@ -43,7 +44,13 @@ export function extractVariable() {
   }
 
   // Find next available line number for the new LET statement
-  const newLineNumber = findNextAvailableLineNumber(document, 10);
+  // Start from the current line number to maintain sequencing
+  const currentLineNumber = getLineNumberAtPosition(
+    document,
+    selectionRange.start,
+  );
+  const startFrom = currentLineNumber ? parseInt(currentLineNumber) + 10 : 10;
+  const newLineNumber = findNextAvailableLineNumber(document, startFrom);
 
   // Infer variable type and generate name
   const varType = inferVariableType(selectedText);
@@ -51,8 +58,10 @@ export function extractVariable() {
   const varName = generateUniqueVariableName(baseName, document);
   const fullVarName = varName + varType.suffix;
 
-  // Create the LET statement with line number
-  const letStatement = `${newLineNumber} LET ${fullVarName} = ${selectedText}`;
+  // Create the LET statement with line number and proper spacing
+  // Ensure there's a space after LET and around operators
+  const spacedExpression = selectedText.trim().replace(/([+\-*/()])/g, " $1 ");
+  const letStatement = `${newLineNumber} LET ${fullVarName} = ${spacedExpression.trim()}`;
 
   // Create text edits
   const edits: TextEdit[] = [];
@@ -62,7 +71,31 @@ export function extractVariable() {
   edits.push(TextEdit.insert(lineStart, `${letStatement}\n`));
 
   // Replace the selected expression with the variable
-  edits.push(TextEdit.replace(selectionRange, fullVarName));
+  // Get the text before and after the selection to determine proper spacing
+  const lineText = document.lineAt(selectionRange.start.line).text;
+  const textBefore = lineText.substring(0, selectionRange.start.character);
+  const textAfter = lineText.substring(selectionRange.end.character);
+
+  // Add space before variable if needed (e.g., after PRINT, LET, etc.)
+  let replacement = fullVarName;
+  if (
+    textBefore.trim().length > 0 &&
+    !textBefore.endsWith(" ") &&
+    !textBefore.endsWith("=")
+  ) {
+    replacement = " " + replacement;
+  }
+
+  // Add space after variable if needed
+  if (
+    textAfter.trim().length > 0 &&
+    !textAfter.startsWith(" ") &&
+    !textAfter.startsWith("\n")
+  ) {
+    replacement = replacement + " ";
+  }
+
+  edits.push(TextEdit.replace(selectionRange, replacement));
 
   // Apply the edits
   editor

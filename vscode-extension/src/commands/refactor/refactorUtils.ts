@@ -1,4 +1,4 @@
-import { TextDocument, Position, Range, TextEdit, window } from "vscode";
+import { TextDocument, Position, Range, TextEdit, window } from 'vscode';
 
 /**
  * Common utilities for refactoring operations
@@ -93,33 +93,33 @@ export function generateUniqueVariableName(
 }
 
 export function inferVariableType(expression: string): {
-  type: "string" | "numeric" | "integer";
+  type: 'string' | 'numeric' | 'integer';
   suffix: string;
 } {
   // Check if expression contains string operations
-  if (expression.includes("+") && expression.includes("$")) {
-    return { type: "string", suffix: "$" };
+  if (expression.includes('+') && expression.includes('$')) {
+    return { type: 'string', suffix: '$' };
   }
 
   // Check if expression is numeric
   if (
     /^\d+$/.test(expression.trim()) ||
-    expression.includes("+") ||
-    expression.includes("-") ||
-    expression.includes("*") ||
-    expression.includes("/") ||
-    expression.includes("(") ||
-    expression.includes(")")
+    expression.includes('+') ||
+    expression.includes('-') ||
+    expression.includes('*') ||
+    expression.includes('/') ||
+    expression.includes('(') ||
+    expression.includes(')')
   ) {
-    return { type: "numeric", suffix: "" };
+    return { type: 'numeric', suffix: '' };
   }
 
   // Default to numeric
-  return { type: "numeric", suffix: "" };
+  return { type: 'numeric', suffix: '' };
 }
 
 export function isValidExpression(expression: string): boolean {
-  if (!expression || expression.trim() === "") return false;
+  if (!expression || expression.trim() === '') return false;
 
   // Basic validation - should not contain statements or line numbers
   const invalidPatterns = [
@@ -196,10 +196,10 @@ export function removeLineNumbers(text: string): string {
   // Remove line numbers from the beginning of each line
   // Preserve the actual code
   return text
-    .split("\n")
+    .split('\n')
     .map((line) => {
       // Remove line number and any following spaces
-      return line.replace(/^\d+\s*/, "");
+      return line.replace(/^\d+\s*/, '');
     })
-    .join("\n");
+    .join('\n');
 }

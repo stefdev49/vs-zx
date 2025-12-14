@@ -1,14 +1,23 @@
-import { commands, ExtensionContext, window, workspace, StatusBarAlignment, StatusBarItem, OutputChannel } from 'vscode';
+import {
+  commands,
+  ExtensionContext,
+  window,
+  workspace,
+  StatusBarAlignment,
+  StatusBarItem,
+  OutputChannel,
+} from 'vscode';
 import * as child_process from 'child_process';
 import * as path from 'path';
-
-const converter = require('converter');
+import * as converter from 'converter';
 
 let activePlaybackProcess: child_process.ChildProcess | null = null;
 let playbackStatusBar: StatusBarItem | null = null;
 let playbackOutputChannel: OutputChannel | null = null;
 
-export function register(context: ExtensionContext): ExtensionContext['subscriptions'][0] {
+export function register(
+  context: ExtensionContext,
+): ExtensionContext['subscriptions'][0] {
   // Create output channel for playback progress
   playbackOutputChannel = window.createOutputChannel('ZX Spectrum Playback');
   context.subscriptions.push(playbackOutputChannel);
@@ -20,14 +29,20 @@ export function register(context: ExtensionContext): ExtensionContext['subscript
   context.subscriptions.push(playbackStatusBar);
 
   // Register play command
-  const playDisposable = commands.registerCommand('zx-basic.playToZx', async () => {
-    await playToZx();
-  });
+  const playDisposable = commands.registerCommand(
+    'zx-basic.playToZx',
+    async () => {
+      await playToZx();
+    },
+  );
 
   // Register stop command
-  const stopDisposable = commands.registerCommand('zx-basic.stopTzxPlayback', async () => {
-    await stopTzxPlayback();
-  });
+  const stopDisposable = commands.registerCommand(
+    'zx-basic.stopTzxPlayback',
+    async () => {
+      await stopTzxPlayback();
+    },
+  );
 
   context.subscriptions.push(playDisposable, stopDisposable);
 
@@ -40,9 +55,9 @@ async function playToZx() {
     const choice = await window.showWarningMessage(
       'A playback is already in progress. Stop it first?',
       'Stop and Play New',
-      'Cancel'
+      'Cancel',
     );
-    
+
     if (choice === 'Stop and Play New') {
       await stopTzxPlayback();
     } else {
@@ -66,7 +81,10 @@ async function playToZx() {
   await document.save();
 
   const content = document.getText();
-  const fileName = path.basename(document.fileName, path.extname(document.fileName));
+  const fileName = path.basename(
+    document.fileName,
+    path.extname(document.fileName),
+  );
 
   // Get configuration
   const config = workspace.getConfiguration('zxBasic.tzxplay');
@@ -87,7 +105,7 @@ async function playToZx() {
           return 'Program name must be 10 characters or less';
         }
         return null;
-      }
+      },
     });
 
     if (!programName) {
@@ -107,31 +125,34 @@ async function playToZx() {
           return 'Line number must be between 0 and 9999';
         }
         return null;
-      }
+      },
     });
 
     if (autostartInput === undefined) {
       return; // User cancelled
     }
 
-    const autostart = autostartInput && autostartInput.length > 0 
-      ? parseInt(autostartInput) 
-      : undefined;
+    const autostart =
+      autostartInput && autostartInput.length > 0
+        ? parseInt(autostartInput)
+        : undefined;
 
     // Show progress
     window.showInformationMessage('Converting to TZX and starting playback...');
-    
+
     // Convert BASIC to TZX
     const tzxBuffer: Buffer = converter.convertBasicToTzx(
       content,
       programName,
       autostart,
-      undefined // No description needed for playback
+      undefined, // No description needed for playback
     );
 
     // Prepare output channel
     if (!playbackOutputChannel) {
-      playbackOutputChannel = window.createOutputChannel('ZX Spectrum Playback');
+      playbackOutputChannel = window.createOutputChannel(
+        'ZX Spectrum Playback',
+      );
     }
     playbackOutputChannel.clear();
     playbackOutputChannel.appendLine(`Playing: ${fileName}`);
@@ -154,7 +175,7 @@ async function playToZx() {
 
     // Spawn tzxplay process
     activePlaybackProcess = child_process.spawn(tzxplayPath, args, {
-      stdio: ['pipe', 'pipe', 'pipe']
+      stdio: ['pipe', 'pipe', 'pipe'],
     });
 
     // Update status bar
@@ -219,16 +240,21 @@ async function playToZx() {
     activePlaybackProcess.on('error', (err) => {
       playbackOutputChannel?.appendLine('---');
       playbackOutputChannel?.appendLine(`Error: ${err.message}`);
-      
+
       if (err.message.includes('ENOENT')) {
-        window.showErrorMessage(
-          'tzxplay not found. Please install tzxplay or configure the path in settings.',
-          'Open Settings'
-        ).then(choice => {
-          if (choice === 'Open Settings') {
-            commands.executeCommand('workbench.action.openSettings', 'zxBasic.tzxplay.path');
-          }
-        });
+        window
+          .showErrorMessage(
+            'tzxplay not found. Please install tzxplay or configure the path in settings.',
+            'Open Settings',
+          )
+          .then((choice) => {
+            if (choice === 'Open Settings') {
+              commands.executeCommand(
+                'workbench.action.openSettings',
+                'zxBasic.tzxplay.path',
+              );
+            }
+          });
       } else {
         window.showErrorMessage(`Playback error: ${err.message}`);
       }
@@ -245,13 +271,12 @@ async function playToZx() {
       activePlaybackProcess.stdin.write(tzxBuffer);
       activePlaybackProcess.stdin.end();
     }
-
   } catch (error) {
     const err = error as Error;
     window.showErrorMessage(`Failed to play TZX: ${err.message}`);
     playbackOutputChannel?.appendLine(`Error: ${err.message}`);
     console.error('Play to ZX error:', err);
-    
+
     // Clean up on error
     if (playbackStatusBar) {
       playbackStatusBar.hide();

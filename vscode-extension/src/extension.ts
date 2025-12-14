@@ -1,4 +1,4 @@
-import * as path from "path";
+import * as path from 'path';
 import {
   workspace,
   ExtensionContext,
@@ -10,7 +10,7 @@ import {
   TextDocument,
   FormattingOptions,
   CancellationToken,
-} from "vscode";
+} from 'vscode';
 
 import {
   LanguageClient,
@@ -18,7 +18,15 @@ import {
   Middleware,
   ServerOptions,
   TransportKind,
-} from "vscode-languageclient/node";
+} from 'vscode-languageclient/node';
+
+// Import command modules
+import * as transferCmd from './commands/transfer';
+import * as saveAsTzxCmd from './commands/saveAsTzx';
+import * as playToZxCmd from './commands/playToZx';
+import * as extractVariableCmd from './commands/refactor/extractVariable';
+import * as renumberLinesCmd from './commands/refactor/renumberLines';
+import * as extractSubroutineCmd from './commands/refactor/extractSubroutine';
 
 let client: LanguageClient;
 
@@ -26,20 +34,20 @@ type SerializedPosition = { line: number; character: number };
 type SerializedRange = { start: SerializedPosition; end: SerializedPosition };
 type SerializedLocation = { uri: string; range: SerializedRange };
 
-const SHOW_REFERENCES_COMMAND = "zx-basic.showReferences";
+const SHOW_REFERENCES_COMMAND = 'zx-basic.showReferences';
 
 function isSerializedPosition(value: unknown): value is SerializedPosition {
   return (
-    typeof value === "object" &&
+    typeof value === 'object' &&
     value !== null &&
-    typeof (value as SerializedPosition).line === "number" &&
-    typeof (value as SerializedPosition).character === "number"
+    typeof (value as SerializedPosition).line === 'number' &&
+    typeof (value as SerializedPosition).character === 'number'
   );
 }
 
 function isSerializedRange(value: unknown): value is SerializedRange {
   return (
-    typeof value === "object" &&
+    typeof value === 'object' &&
     value !== null &&
     isSerializedPosition((value as SerializedRange).start) &&
     isSerializedPosition((value as SerializedRange).end)
@@ -48,9 +56,9 @@ function isSerializedRange(value: unknown): value is SerializedRange {
 
 function isSerializedLocation(value: unknown): value is SerializedLocation {
   return (
-    typeof value === "object" &&
+    typeof value === 'object' &&
     value !== null &&
-    typeof (value as SerializedLocation).uri === "string" &&
+    typeof (value as SerializedLocation).uri === 'string' &&
     isSerializedRange((value as SerializedLocation).range)
   );
 }
@@ -76,7 +84,7 @@ function transformShowReferencesLens(
 
   const [uriString, positionData, locationsData] = lens.command.arguments ?? [];
   if (
-    typeof uriString !== "string" ||
+    typeof uriString !== 'string' ||
     !isSerializedPosition(positionData) ||
     !Array.isArray(locationsData)
   ) {
@@ -91,12 +99,12 @@ function transformShowReferencesLens(
       .map(reviveLocation);
 
     lens.command = {
-      title: lens.command.title ?? "Show References",
-      command: "editor.action.showReferences",
+      title: lens.command.title ?? 'Show References',
+      command: 'editor.action.showReferences',
       arguments: [uri, position, locations],
     };
   } catch (error) {
-    console.error("Failed to convert ZX BASIC CodeLens command", error);
+    console.error('Failed to convert ZX BASIC CodeLens command', error);
   }
 
   return lens;
@@ -115,12 +123,12 @@ function transformShowReferencesLensArray(
 export function activate(context: ExtensionContext) {
   // The server is implemented in node
   const serverModule = context.asAbsolutePath(
-    path.join("out", "server", "server.js"),
+    path.join('out', 'server', 'server.js'),
   );
 
   // The debug options for the server
   // --inspect=6009: runs the server in Node's Inspector mode so VS Code can attach to the server for debugging
-  const debugOptions = { execArgv: ["--nolazy", "--inspect=6009"] };
+  const debugOptions = { execArgv: ['--nolazy', '--inspect=6009'] };
 
   // If the extension is launched in debug mode then the debug server options are used
   // Otherwise the run options are used
@@ -163,18 +171,18 @@ export function activate(context: ExtensionContext) {
 
   const clientOptions: LanguageClientOptions = {
     // Register the server for plain text documents
-    documentSelector: [{ scheme: "file", language: "zx-basic" }],
+    documentSelector: [{ scheme: 'file', language: 'zx-basic' }],
     synchronize: {
       // Notify the server about file changes to '.clientrc files contained in the workspace
-      fileEvents: workspace.createFileSystemWatcher("**/.clientrc"),
+      fileEvents: workspace.createFileSystemWatcher('**/.clientrc'),
     },
     middleware,
   };
 
   // Create the language client and start the client.
   client = new LanguageClient(
-    "zxBasicServer",
-    "ZX BASIC Server",
+    'zxBasicServer',
+    'ZX BASIC Server',
     serverOptions,
     clientOptions,
   );
@@ -183,31 +191,52 @@ export function activate(context: ExtensionContext) {
   client.start();
 
   // Register command for transfer (use source so bundler can include it)
-  const transferCmd = require("./commands/transfer");
   context.subscriptions.push(transferCmd.register());
 
   // Register command for save as TZX
-  const saveAsTzxCmd = require("./commands/saveAsTzx");
   context.subscriptions.push(saveAsTzxCmd.register());
 
   // Register command for play to ZX
-  const playToZxCmd = require("./commands/playToZx");
   playToZxCmd.register(context);
 
   // Register refactoring commands
-  const extractVariableCmd = require("./commands/refactor/extractVariable");
   context.subscriptions.push(extractVariableCmd.register());
-
-  const renumberLinesCmd = require("./commands/refactor/renumberLines");
   context.subscriptions.push(renumberLinesCmd.register());
-
-  const extractSubroutineCmd = require("./commands/refactor/extractSubroutine");
   context.subscriptions.push(extractSubroutineCmd.register());
+
+  try {
+    context.subscriptions.push(renumberLinesCmd.register());
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.warn(`Failed to register renumberLines command: ${err.message}`);
+  }
+
+  try {
+    context.subscriptions.push(extractSubroutineCmd.register());
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.warn(
+      `Failed to register extractSubroutine command: ${err.message}`,
+    );
+  }
+
+  try {
+    context.subscriptions.push(renumberLinesCmd.register());
+  } catch (error: any) {
+    console.warn(`Failed to register renumberLines command: ${error.message}`);
+  }
+
+  try {
+    context.subscriptions.push(extractSubroutineCmd.register());
+  } catch (error: any) {
+    console.warn(
+      `Failed to register extractSubroutine command: ${error.message}`,
+    );
+  }
 }
 
 export function deactivate(): Thenable<void> | undefined {
   // Clean up any active playback
-  const playToZxCmd = require("./commands/playToZx");
   if (playToZxCmd.deactivate) {
     playToZxCmd.deactivate();
   }

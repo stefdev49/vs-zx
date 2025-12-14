@@ -2,7 +2,7 @@
   "name": "zx-basic-vscode-extension",
   "repository": "git+https://github.com/stef/vs-zx.git",
   "displayName": "ZX BASIC Development Environment",
-  "version": "1.0.112",
+  "version": "1.0.116",
   "description": "VS Code extension for ZX Spectrum BASIC development with Interface 1 transfer",
   "license": "MIT",
   "engines": {
@@ -90,6 +90,18 @@
         },
         {
           "command": "zx-basic.stopTzxPlayback"
+        },
+        {
+          "command": "zx-basic.extractVariable",
+          "when": "editorLangId == zx-basic"
+        },
+        {
+          "command": "zx-basic.renumberLines",
+          "when": "editorLangId == zx-basic"
+        },
+        {
+          "command": "zx-basic.extractSubroutine",
+          "when": "editorLangId == zx-basic"
         }
       ],
       "editor/title": [
@@ -107,12 +119,14 @@
         {
           "command": "zx-basic.extractVariable",
           "when": "editorLangId == zx-basic",
-          "group": "2_refactoring"
+          "group": "2_refactoring",
+          "submenu": "Refactor..."
         },
         {
           "command": "zx-basic.renumberLines",
           "when": "editorLangId == zx-basic",
-          "group": "2_refactoring"
+          "group": "2_refactoring",
+          "submenu": "Refactor..."
         }
       ],
       "editor/context": [
@@ -129,17 +143,20 @@
         {
           "command": "zx-basic.extractVariable",
           "when": "editorLangId == zx-basic",
-          "group": "2_refactoring"
+          "group": "2_refactoring",
+          "submenu": "Refactor..."
         },
         {
           "command": "zx-basic.renumberLines",
           "when": "editorLangId == zx-basic",
-          "group": "2_refactoring"
+          "group": "2_refactoring",
+          "submenu": "Refactor..."
         },
         {
           "command": "zx-basic.extractSubroutine",
           "when": "editorLangId == zx-basic && editorHasSelection",
-          "group": "2_refactoring"
+          "group": "2_refactoring",
+          "submenu": "Refactor..."
         }
       ]
     },

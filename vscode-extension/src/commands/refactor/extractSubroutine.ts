@@ -43,8 +43,7 @@ export function extractSubroutine() {
   }
 
   // Find line numbers for subroutine
-  // Try to find a line number that's higher than most existing code
-  // but not too high to avoid gaps
+  // Place subroutine at the end of the program with high line numbers
   const lastLineNumber = getLastLineNumber(document);
   const subroutineLineNumber = findNextAvailableLineNumber(
     document,
@@ -67,9 +66,11 @@ export function extractSubroutine() {
     .filter((line) => line.trim() !== "");
   const returnLineNumber = codeLineNumber + extractedLines.length * 10;
 
-  // Add line numbers to each line of the extracted code
+  // Add line numbers to each line of the extracted code with proper sequencing
   const linesWithNumbers = extractedLines.map((line, index) => {
-    return `${codeLineNumber + index * 10} ${line}`;
+    const lineNumber = codeLineNumber + index * 10;
+    // Ensure proper spacing after line number
+    return `${lineNumber} ${line.trim()}`;
   });
 
   // Create subroutine text
@@ -87,6 +88,12 @@ ${returnLineNumber} RETURN`;
   const gosubLineNumber =
     firstLineNumber || findNextAvailableLineNumber(document, 10);
   const gosubCall = `${gosubLineNumber} GOSUB ${subroutineLineNumber}`;
+
+  // The extractSubroutine feature will:
+  // 1. Extract the selected code block
+  // 2. Move it to the end of the program
+  // 3. Replace the selection with a GOSUB call
+  // 4. Properly renumber all moved lines
 
   // Create text edits
   const edits: TextEdit[] = [];
