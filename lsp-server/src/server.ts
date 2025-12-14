@@ -2511,9 +2511,18 @@ function analyzeVariableUsage(
   // Normalize variable name (remove type suffix for comparison)
   const baseName = variableName.replace(/[$%]$/, "").toUpperCase();
 
+  // Build a map from file line (0-based) to BASIC line number
+  const fileLineToBasicLine: Map<number, string> = new Map();
+  for (const token of tokens) {
+    if (token.type === TokenType.LINE_NUMBER) {
+      fileLineToBasicLine.set(token.line, token.value);
+    }
+  }
+
   // Find all occurrences of this variable
   const occurrences: {
     line: number;
+    basicLine: string;
     character: number;
     isDeclaration: boolean;
     context: string;
@@ -2521,7 +2530,7 @@ function analyzeVariableUsage(
 
   // Track if we find any declarations
   let hasDeclaration = false;
-  let declarationLine: number | null = null;
+  let declarationBasicLine: string | null = null;
 
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i];
@@ -2552,15 +2561,18 @@ function analyzeVariableUsage(
           context = "FOR";
         }
 
+        const basicLine = fileLineToBasicLine.get(token.line) || String(token.line + 1);
+
         if (isDeclaration) {
           hasDeclaration = true;
-          if (declarationLine === null) {
-            declarationLine = token.line;
+          if (declarationBasicLine === null) {
+            declarationBasicLine = basicLine;
           }
         }
 
         occurrences.push({
           line: token.line,
+          basicLine,
           character: token.start,
           isDeclaration,
           context,
@@ -2573,11 +2585,17 @@ function analyzeVariableUsage(
     return null;
   }
 
+  // Get document URI for creating links
+  const docUri = document.uri;
+
   // Build hover information
   let hoverInfo = `**${variableName}**\n\n`;
 
-  if (hasDeclaration) {
-    hoverInfo += `✅ **Declared** on line ${declarationLine}\n\n`;
+  // Find declaration occurrence for linking
+  const declOcc = occurrences.find(o => o.isDeclaration);
+  if (hasDeclaration && declOcc) {
+    const declFileLineNum = declOcc.line + 1;
+    hoverInfo += `✅ **Declared** on [line ${declarationBasicLine}](${docUri}#L${declFileLineNum})\n\n`;
   } else {
     hoverInfo += `⚠️ **Potentially undefined** - no declaration found\n\n`;
   }
@@ -2587,7 +2605,8 @@ function analyzeVariableUsage(
   if (occurrences.length <= 10) {
     hoverInfo += "📋 **Usage locations:**\n";
     for (const occ of occurrences) {
-      hoverInfo += `- Line ${occ.line + 1}\n`;
+      const fileLineNum = occ.line + 1;
+      hoverInfo += `- [Line ${occ.basicLine}](${docUri}#L${fileLineNum})\n`;
     }
   } else {
     hoverInfo += `📋 **Used in ${occurrences.length} locations throughout the program**\n`;
