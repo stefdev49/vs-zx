@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const converter = require('./converter');
+const converter = require('../converter/out');
 
 // Test TZX conversion on all BASIC files in samples/
 async function testTzxConversion() {

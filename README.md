@@ -3,18 +3,20 @@
 This vs code extension is a complete environment to support development of programs for ZX Spectrum 2+ or ZX Spectrum 48K with ZX Interface 1. The coding takes place in vs code on a linux pc, then program is transfered on real hardware using RS232.
 
 ## Features
+Legend: `[x]` = Done, `[ ]` = To Do, `[ ] (WIP)` = In Progress.
 
-- Complete ZX Spectrum BASIC support in VS Code with a LSP server
-- Converter from text file to ZX Spectrum BASIC
-- RS232 transfer utility
-- **Save as TZX** - Convert BASIC programs to TZX tape format for use with emulators and tape preservation tools
-- **Play to ZX Spectrum** - Convert and play BASIC programs directly through audio using tzxplay, no file writing needed
-- **Advanced Refactoring** - Extract variables, extract subroutines, and other code transformations
-- **Code Formatting** - Automatic line numbering, keyword uppercasing, and code cleanup
+- [x] Complete ZX Spectrum BASIC support in VS Code with a LSP server
+- [x] **Converter** from text file to ZX Spectrum BASIC
+- [x] (WIP) **RS232** transfer utility
+- [x] **Save as TZX** - Convert BASIC programs to TZX tape format for use with emulators and tape preservation tools
+- [x] **Play to ZX Spectrum** - Convert and play BASIC programs directly through audio using tzxplay, no file writing needed
+- [x] **Advanced Refactoring** - Extract variables, extract subroutines, and other code transformations
+- [x] **Code Formatting** - Automatic line numbering, keyword uppercasing, and code cleanup
+- [ ] **Save to mdv** - Convert BASIC programs to MDV format
+- [ ] **Network transfer** - Transfer BASIC programs to ZX Spectrum using ZX Interface 1. (will need a modified https://oqtadrive.org/ version)
 
 ## LSP Feature Roadmap
 
-Legend: `[x]` = Done, `[ ]` = To Do, `[ ] (WIP)` = In Progress.
 
 ### Core Navigation
 
