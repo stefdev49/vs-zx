@@ -1323,7 +1323,7 @@ connection.onCompletion(
     let startChar = position.character - 1;
 
     // Walk backwards to find word boundary
-    while (startChar >= 0 && /[A-Za-z0-9_$%]/.test(lineText[startChar])) {
+    while (startChar >= 0 && /[A-Za-z0-9$%]/.test(lineText[startChar])) {
       startChar--;
     }
 
@@ -1622,7 +1622,7 @@ connection.onHover((params: HoverParams): Hover => {
   let endChar = position.character;
 
   // Move start backward to find word boundary
-  while (startChar > 0 && /[A-Za-z0-9_$%]/.test(fullLineText[startChar - 1])) {
+  while (startChar > 0 && /[A-Za-z0-9$%]/.test(fullLineText[startChar - 1])) {
     startChar--;
   }
 
@@ -3631,7 +3631,7 @@ connection.onDocumentOnTypeFormatting(
       );
       return [];
     }
-    
+
     const document = documents.get(params.textDocument.uri);
     if (!document) {
       connection.console.log(
@@ -3659,9 +3659,7 @@ connection.onDocumentOnTypeFormatting(
       })
       .replace(/\n$/, "");
 
-    connection.console.log(
-      `[format-on-type] Line text: "${lineText}"`,
-    );
+    connection.console.log(`[format-on-type] Line text: "${lineText}"`);
 
     const position = params.position;
     let wordBeforeTrigger = getWordBeforePosition(lineText, position.character);
@@ -3679,9 +3677,7 @@ connection.onDocumentOnTypeFormatting(
     }
 
     if (!wordBeforeTrigger) {
-      connection.console.log(
-        `[format-on-type] No keyword found to uppercase`,
-      );
+      connection.console.log(`[format-on-type] No keyword found to uppercase`);
       return [];
     }
 

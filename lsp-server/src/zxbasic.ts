@@ -3,91 +3,91 @@
 
 export enum TokenType {
   // Generic categories
-  KEYWORD = 'KEYWORD',
-  OPERATOR = 'OPERATOR',
-  PUNCTUATION = 'PUNCTUATION',
-  COMMENT = 'COMMENT',
+  KEYWORD = "KEYWORD",
+  OPERATOR = "OPERATOR",
+  PUNCTUATION = "PUNCTUATION",
+  COMMENT = "COMMENT",
 
   // Keywords (will be lexed as KEYWORD with specific value)
-  LET = 'LET',
-  IF = 'IF',
-  THEN = 'THEN',
-  FOR = 'FOR',
-  TO = 'TO',
-  STEP = 'STEP',
-  NEXT = 'NEXT',
-  READ = 'READ',
-  DATA = 'DATA',
-  RESTORE = 'RESTORE',
-  DIM = 'DIM',
-  DEF = 'DEF FN',
-  FN = 'FN',
-  GOTO = 'GO TO',
-  GOSUB = 'GO SUB',
-  RETURN = 'RETURN',
-  STOP = 'STOP',
-  RANDOMIZE = 'RANDOMIZE',
-  CLEAR = 'CLEAR',
-  CLS = 'CLS',
-  INPUT = 'INPUT',
-  LOAD = 'LOAD',
-  SAVE = 'SAVE',
-  VERIFY = 'VERIFY',
-  MERGE = 'MERGE',
-  BEEP = 'BEEP',
-  INK = 'INK',
-  PAPER = 'PAPER',
-  FLASH = 'FLASH',
-  BRIGHT = 'BRIGHT',
-  INVERSE = 'INVERSE',
-  OVER = 'OVER',
-  BORDER = 'BORDER',
-  PLOT = 'PLOT',
-  DRAW = 'DRAW',
-  CIRCLE = 'CIRCLE',
-  LPRINT = 'LPRINT',
-  LLIST = 'LLIST',
-  COPY = 'COPY',
-  SPECTRUM = 'SPECTRUM',
-  PLAY = 'PLAY',
-  ERASE = 'ERASE',
-  CAT = 'CAT',
-  FORMAT = 'FORMAT',
-  MOVE = 'MOVE',
+  LET = "LET",
+  IF = "IF",
+  THEN = "THEN",
+  FOR = "FOR",
+  TO = "TO",
+  STEP = "STEP",
+  NEXT = "NEXT",
+  READ = "READ",
+  DATA = "DATA",
+  RESTORE = "RESTORE",
+  DIM = "DIM",
+  DEF = "DEF FN",
+  FN = "FN",
+  GOTO = "GO TO",
+  GOSUB = "GO SUB",
+  RETURN = "RETURN",
+  STOP = "STOP",
+  RANDOMIZE = "RANDOMIZE",
+  CLEAR = "CLEAR",
+  CLS = "CLS",
+  INPUT = "INPUT",
+  LOAD = "LOAD",
+  SAVE = "SAVE",
+  VERIFY = "VERIFY",
+  MERGE = "MERGE",
+  BEEP = "BEEP",
+  INK = "INK",
+  PAPER = "PAPER",
+  FLASH = "FLASH",
+  BRIGHT = "BRIGHT",
+  INVERSE = "INVERSE",
+  OVER = "OVER",
+  BORDER = "BORDER",
+  PLOT = "PLOT",
+  DRAW = "DRAW",
+  CIRCLE = "CIRCLE",
+  LPRINT = "LPRINT",
+  LLIST = "LLIST",
+  COPY = "COPY",
+  SPECTRUM = "SPECTRUM",
+  PLAY = "PLAY",
+  ERASE = "ERASE",
+  CAT = "CAT",
+  FORMAT = "FORMAT",
+  MOVE = "MOVE",
 
   // Operators and symbols
-  PLUS = '+',
-  MINUS = '-',
-  MULTIPLY = '*',
-  DIVIDE = '/',
-  POWER = '^',
-  EQUALS = '=',
-  NOT_EQUALS = '<>',
-  LESS_THAN = '<',
-  GREATER_THAN = '>',
-  LESS_EQUAL = '<=',
-  GREATER_EQUAL = '>=',
-  AND = 'AND',
-  OR = 'OR',
-  NOT = 'NOT',
+  PLUS = "+",
+  MINUS = "-",
+  MULTIPLY = "*",
+  DIVIDE = "/",
+  POWER = "^",
+  EQUALS = "=",
+  NOT_EQUALS = "<>",
+  LESS_THAN = "<",
+  GREATER_THAN = ">",
+  LESS_EQUAL = "<=",
+  GREATER_EQUAL = ">=",
+  AND = "AND",
+  OR = "OR",
+  NOT = "NOT",
 
   // Literals
-  NUMBER = 'NUMBER',
-  STRING = 'STRING',
-  IDENTIFIER = 'IDENTIFIER',
-  LINE_NUMBER = 'LINE_NUMBER',
+  NUMBER = "NUMBER",
+  STRING = "STRING",
+  IDENTIFIER = "IDENTIFIER",
+  LINE_NUMBER = "LINE_NUMBER",
 
   // Punctuation
-  LPAREN = '(',
-  RPAREN = ')',
-  COLON = ':',
-  SEMICOLON = ';',
-  COMMA = ',',
-  STATEMENT_SEPARATOR = 'STATEMENT_SEPARATOR',
+  LPAREN = "(",
+  RPAREN = ")",
+  COLON = ":",
+  SEMICOLON = ";",
+  COMMA = ",",
+  STATEMENT_SEPARATOR = "STATEMENT_SEPARATOR",
 
   // Special
-  EOF = 'EOF',
-  INVALID = 'INVALID'
+  EOF = "EOF",
+  INVALID = "INVALID",
 }
 
 export interface Token {
@@ -105,7 +105,7 @@ export class ZXBasicLexer {
   private column: number = 0;
 
   constructor() {
-    this.text = '';
+    this.text = "";
   }
 
   tokenize(text: string): Token[] {
@@ -118,18 +118,23 @@ export class ZXBasicLexer {
 
     while (this.position < this.text.length) {
       const char = this.currentChar();
-      if (char === '\n') {
+      if (char === "\n") {
         this.line++;
         this.column = 0;
         this.advance();
         atLineStart = true; // Next non-whitespace could be a line number
-      } else if (char === '\t' || char === ' ') {
+      } else if (char === "\t" || char === " ") {
         this.advance();
       } else if (atLineStart && this.isDigit(char)) {
         // Line number at start of line
         tokens.push(this.lexLineNumber());
         atLineStart = false;
-      } else if (this.isDigit(char) || (char === '.' && this.position + 1 < this.text.length && this.isDigit(this.text[this.position + 1]))) {
+      } else if (
+        this.isDigit(char) ||
+        (char === "." &&
+          this.position + 1 < this.text.length &&
+          this.isDigit(this.text[this.position + 1]))
+      ) {
         tokens.push(this.lexNumber());
         atLineStart = false;
       } else if (this.isLetter(char)) {
@@ -138,15 +143,15 @@ export class ZXBasicLexer {
       } else if (char === '"') {
         tokens.push(this.lexString());
         atLineStart = false;
-      } else if (char === ':') {
+      } else if (char === ":") {
         // Colon is a statement separator in ZX BASIC
         const startCol = this.column;
         const token: Token = {
           type: TokenType.STATEMENT_SEPARATOR,
-          value: ':',
+          value: ":",
           line: this.line,
           start: startCol,
-          end: startCol + 1
+          end: startCol + 1,
         };
         tokens.push(token);
         this.advance();
@@ -158,7 +163,7 @@ export class ZXBasicLexer {
           value: char,
           line: this.line,
           start: startCol,
-          end: startCol + 1
+          end: startCol + 1,
         };
         tokens.push(token);
         this.advance();
@@ -173,7 +178,7 @@ export class ZXBasicLexer {
           value: char,
           line: this.line,
           start: startCol,
-          end: startCol + 1
+          end: startCol + 1,
         });
         this.advance();
       }
@@ -181,10 +186,10 @@ export class ZXBasicLexer {
 
     tokens.push({
       type: TokenType.EOF,
-      value: '',
+      value: "",
       line: this.line,
       start: this.column,
-      end: this.column
+      end: this.column,
     });
     return tokens;
   }
@@ -194,7 +199,9 @@ export class ZXBasicLexer {
   }
 
   private peekNext(): string {
-    return this.position + 1 < this.text.length ? this.text[this.position + 1] : '';
+    return this.position + 1 < this.text.length
+      ? this.text[this.position + 1]
+      : "";
   }
 
   private advance(): void {
@@ -207,24 +214,28 @@ export class ZXBasicLexer {
   }
 
   private isLetter(char: string): boolean {
-    return /[a-zA-Z_]/.test(char);
+    return /[a-zA-Z]/.test(char);
   }
 
   private isOperator(char: string): boolean {
-    return ['+', '-', '*', '/', '^', '=', '<', '>'].includes(char);
+    return ["+", "-", "*", "/", "^", "=", "<", ">"].includes(char);
   }
 
   private isPunctuation(char: string): boolean {
-    return ['(', ')', ';', ','].includes(char);
+    return ["(", ")", ";", ","].includes(char);
   }
 
-  private createToken(type: TokenType, value: string, startOffset: number = 0): Token {
+  private createToken(
+    type: TokenType,
+    value: string,
+    startOffset: number = 0,
+  ): Token {
     return {
       type,
       value,
       line: this.line,
       start: this.column - startOffset,
-      end: this.column
+      end: this.column,
     };
   }
 
@@ -239,7 +250,7 @@ export class ZXBasicLexer {
       const char = this.currentChar();
       if (this.isDigit(char)) {
         this.advance();
-      } else if (char === '.' && !hasDot && !hasExponent) {
+      } else if (char === "." && !hasDot && !hasExponent) {
         hasDot = true;
         this.advance();
       } else {
@@ -248,20 +259,29 @@ export class ZXBasicLexer {
     }
 
     // Check for exponent (E or e followed by optional +/- and digits)
-    if (this.position < this.text.length && (this.currentChar() === 'E' || this.currentChar() === 'e')) {
+    if (
+      this.position < this.text.length &&
+      (this.currentChar() === "E" || this.currentChar() === "e")
+    ) {
       const savedPos = this.position;
       const savedCol = this.column;
       this.advance(); // consume E/e
-      
+
       // Allow optional + or -
-      if (this.currentChar() === '+' || this.currentChar() === '-') {
+      if (this.currentChar() === "+" || this.currentChar() === "-") {
         this.advance();
       }
 
       // Must have at least one digit after E
-      if (this.position < this.text.length && this.isDigit(this.currentChar())) {
+      if (
+        this.position < this.text.length &&
+        this.isDigit(this.currentChar())
+      ) {
         hasExponent = true;
-        while (this.position < this.text.length && this.isDigit(this.currentChar())) {
+        while (
+          this.position < this.text.length &&
+          this.isDigit(this.currentChar())
+        ) {
           this.advance();
         }
       } else {
@@ -277,7 +297,7 @@ export class ZXBasicLexer {
       value,
       line: this.line,
       start: startCol,
-      end: this.column
+      end: this.column,
     };
   }
 
@@ -286,7 +306,10 @@ export class ZXBasicLexer {
     const startCol = this.column;
 
     // Read digits only (line numbers are integers 1-9999)
-    while (this.position < this.text.length && this.isDigit(this.currentChar())) {
+    while (
+      this.position < this.text.length &&
+      this.isDigit(this.currentChar())
+    ) {
       this.advance();
     }
 
@@ -296,7 +319,7 @@ export class ZXBasicLexer {
       value,
       line: this.line,
       start: startCol,
-      end: this.column
+      end: this.column,
     };
   }
 
@@ -305,23 +328,26 @@ export class ZXBasicLexer {
     const startCol = this.column;
 
     // Include letters, digits, and ZX BASIC suffixes ($ for strings, % for integers)
-    while (this.position < this.text.length &&
-           (this.isLetter(this.currentChar()) ||
-            this.isDigit(this.currentChar()))) {
+    while (
+      this.position < this.text.length &&
+      (this.isLetter(this.currentChar()) || this.isDigit(this.currentChar()))
+    ) {
       this.advance();
     }
 
     // Check for string ($) or integer (%) suffix
-    if (this.position < this.text.length && 
-        (this.currentChar() === '$' || this.currentChar() === '%')) {
+    if (
+      this.position < this.text.length &&
+      (this.currentChar() === "$" || this.currentChar() === "%")
+    ) {
       this.advance();
     }
 
     let value = this.text.substring(start, this.position).toUpperCase();
-    
+
     // Special handling for REM comments - consume rest of line
-    if (value === 'REM') {
-      while (this.position < this.text.length && this.currentChar() !== '\n') {
+    if (value === "REM") {
+      while (this.position < this.text.length && this.currentChar() !== "\n") {
         this.advance();
       }
       const commentValue = this.text.substring(start, this.position);
@@ -330,38 +356,48 @@ export class ZXBasicLexer {
         value: commentValue,
         line: this.line,
         start: startCol,
-        end: this.column
+        end: this.column,
       };
     }
-    
+
     // Special handling for two-word keywords: "GO TO", "GO SUB", "DEF FN", "INPUT LINE"
-    if (value === 'GO' || value === 'DEF' || value === 'INPUT') {
+    if (value === "GO" || value === "DEF" || value === "INPUT") {
       const savedPos = this.position;
       const savedCol = this.column;
-      
+
       // Skip whitespace
-      while (this.position < this.text.length && 
-             (this.currentChar() === ' ' || this.currentChar() === '\t')) {
+      while (
+        this.position < this.text.length &&
+        (this.currentChar() === " " || this.currentChar() === "\t")
+      ) {
         this.advance();
       }
-      
+
       // Check if next word forms a two-word keyword
       const nextWordStart = this.position;
-      if (this.position < this.text.length && this.isLetter(this.currentChar())) {
-        while (this.position < this.text.length &&
-               (this.isLetter(this.currentChar()) || this.isDigit(this.currentChar()))) {
+      if (
+        this.position < this.text.length &&
+        this.isLetter(this.currentChar())
+      ) {
+        while (
+          this.position < this.text.length &&
+          (this.isLetter(this.currentChar()) ||
+            this.isDigit(this.currentChar()))
+        ) {
           this.advance();
         }
-        const nextWord = this.text.substring(nextWordStart, this.position).toUpperCase();
-        
-        if (value === 'GO' && nextWord === 'TO') {
-          value = 'GOTO';  // Normalize to single word
-        } else if (value === 'GO' && nextWord === 'SUB') {
-          value = 'GOSUB';  // Normalize to single word
-        } else if (value === 'DEF' && nextWord === 'FN') {
-          value = 'DEFFN';  // Normalize to single word
-        } else if (value === 'INPUT' && nextWord === 'LINE') {
-          value = 'INPUT';  // Keep as INPUT, LINE is consumed as part of INPUT syntax
+        const nextWord = this.text
+          .substring(nextWordStart, this.position)
+          .toUpperCase();
+
+        if (value === "GO" && nextWord === "TO") {
+          value = "GOTO"; // Normalize to single word
+        } else if (value === "GO" && nextWord === "SUB") {
+          value = "GOSUB"; // Normalize to single word
+        } else if (value === "DEF" && nextWord === "FN") {
+          value = "DEFFN"; // Normalize to single word
+        } else if (value === "INPUT" && nextWord === "LINE") {
+          value = "INPUT"; // Keep as INPUT, LINE is consumed as part of INPUT syntax
         } else {
           // Not a two-word keyword, restore position
           this.position = savedPos;
@@ -373,7 +409,7 @@ export class ZXBasicLexer {
         this.column = savedCol;
       }
     }
-    
+
     const tokenType = this.getKeywordType(value);
 
     return {
@@ -381,7 +417,7 @@ export class ZXBasicLexer {
       value,
       line: this.line,
       start: startCol,
-      end: this.column
+      end: this.column,
     };
   }
 
@@ -404,7 +440,7 @@ export class ZXBasicLexer {
       value,
       line: this.line,
       start: startCol,
-      end: this.column
+      end: this.column,
     };
   }
 
@@ -413,32 +449,32 @@ export class ZXBasicLexer {
     const char = this.currentChar();
     this.advance();
 
-    if (char === '<' && this.currentChar() === '>') {
+    if (char === "<" && this.currentChar() === ">") {
       this.advance();
       return {
         type: TokenType.OPERATOR,
-        value: '<>',
+        value: "<>",
         line: this.line,
         start: startCol,
-        end: this.column
+        end: this.column,
       };
-    } else if (char === '<' && this.currentChar() === '=') {
+    } else if (char === "<" && this.currentChar() === "=") {
       this.advance();
       return {
         type: TokenType.OPERATOR,
-        value: '<=',
+        value: "<=",
         line: this.line,
         start: startCol,
-        end: this.column
+        end: this.column,
       };
-    } else if (char === '>' && this.currentChar() === '=') {
+    } else if (char === ">" && this.currentChar() === "=") {
       this.advance();
       return {
         type: TokenType.OPERATOR,
-        value: '>=',
+        value: ">=",
         line: this.line,
         start: startCol,
-        end: this.column
+        end: this.column,
       };
     } else {
       return {
@@ -446,7 +482,7 @@ export class ZXBasicLexer {
         value: char,
         line: this.line,
         start: startCol,
-        end: this.column
+        end: this.column,
       };
     }
   }
@@ -455,24 +491,97 @@ export class ZXBasicLexer {
     // ZX BASIC keywords (based on ROM disassembly)
     // Note: Two-word keywords (GO TO, GO SUB, DEF FN, INPUT LINE) are normalized before reaching here
     // Operators (AND, OR, NOT) have dedicated TokenTypes and are not keywords
-    
+
     // Check for operators first (they have dedicated TokenTypes)
-    if (value === 'AND') return TokenType.AND;
-    if (value === 'OR') return TokenType.OR;
-    if (value === 'NOT') return TokenType.NOT;
-    
+    if (value === "AND") return TokenType.AND;
+    if (value === "OR") return TokenType.OR;
+    if (value === "NOT") return TokenType.NOT;
+
     const keywords = [
-      'PRINT', 'LET', 'IF', 'THEN', 'FOR', 'TO', 'STEP', 'NEXT',
-      'READ', 'DATA', 'RESTORE', 'DIM',
-      'FN', 'DEFFN', 'GOTO', 'GOSUB', 'RETURN', 'STOP', 'RANDOMIZE', 'CONTINUE',
-      'CLEAR', 'CLS', 'INPUT', 'LOAD', 'SAVE', 'VERIFY', 'MERGE', 'BEEP',
-      'INK', 'PAPER', 'FLASH', 'BRIGHT', 'INVERSE', 'OVER', 'BORDER', 'PLOT',
-      'DRAW', 'CIRCLE', 'LPRINT', 'LLIST', 'COPY', 'SPECTRUM', 'PLAY', 'ERASE',
-      'CAT', 'FORMAT', 'MOVE', 'OUT', 'IN', 'OPEN', 'CLOSE', 'POKE', 'RUN', 'LIST', 'NEW', 'PAUSE',
-      'VAL', 'LEN', 'STR$', 'CHR$', 'CODE', 'SIN',
-      'COS', 'TAN', 'ASN', 'ACS', 'ATN', 'LN', 'EXP', 'INT', 'SQR', 'SGN',
-      'ABS', 'PEEK', 'USR', 'INKEY$', 'PI', 'RND', 'ATTR',
-      'SCREEN$', 'POINT', 'TAB', 'VAL$', 'AT'
+      "PRINT",
+      "LET",
+      "IF",
+      "THEN",
+      "FOR",
+      "TO",
+      "STEP",
+      "NEXT",
+      "READ",
+      "DATA",
+      "RESTORE",
+      "DIM",
+      "FN",
+      "DEFFN",
+      "GOTO",
+      "GOSUB",
+      "RETURN",
+      "STOP",
+      "RANDOMIZE",
+      "CONTINUE",
+      "CLEAR",
+      "CLS",
+      "INPUT",
+      "LOAD",
+      "SAVE",
+      "VERIFY",
+      "MERGE",
+      "BEEP",
+      "INK",
+      "PAPER",
+      "FLASH",
+      "BRIGHT",
+      "INVERSE",
+      "OVER",
+      "BORDER",
+      "PLOT",
+      "DRAW",
+      "CIRCLE",
+      "LPRINT",
+      "LLIST",
+      "COPY",
+      "SPECTRUM",
+      "PLAY",
+      "ERASE",
+      "CAT",
+      "FORMAT",
+      "MOVE",
+      "OUT",
+      "IN",
+      "OPEN",
+      "CLOSE",
+      "POKE",
+      "RUN",
+      "LIST",
+      "NEW",
+      "PAUSE",
+      "VAL",
+      "LEN",
+      "STR$",
+      "CHR$",
+      "CODE",
+      "SIN",
+      "COS",
+      "TAN",
+      "ASN",
+      "ACS",
+      "ATN",
+      "LN",
+      "EXP",
+      "INT",
+      "SQR",
+      "SGN",
+      "ABS",
+      "PEEK",
+      "USR",
+      "INKEY$",
+      "PI",
+      "RND",
+      "ATTR",
+      "SCREEN$",
+      "POINT",
+      "TAB",
+      "VAL$",
+      "AT",
     ];
 
     if (keywords.includes(value)) {
@@ -484,9 +593,24 @@ export class ZXBasicLexer {
 
 // Simple AST node for expressions
 export interface ASTNode {
-  type: 'binary_expr' | 'unary_expr' | 'literal' | 'number' | 'string' | 'identifier' | 'function' |
-    'let_statement' | 'print_statement' | 'input_statement' | 'if_statement' | 'for_statement' |
-    'dim_statement' | 'goto_statement' | 'gosub_statement' | 'read_statement' | 'data_statement';
+  type:
+    | "binary_expr"
+    | "unary_expr"
+    | "literal"
+    | "number"
+    | "string"
+    | "identifier"
+    | "function"
+    | "let_statement"
+    | "print_statement"
+    | "input_statement"
+    | "if_statement"
+    | "for_statement"
+    | "dim_statement"
+    | "goto_statement"
+    | "gosub_statement"
+    | "read_statement"
+    | "data_statement";
   operator?: string;
   left?: ASTNode;
   right?: ASTNode;
@@ -533,31 +657,31 @@ export class ZXBasicParser {
   parseStatement(): ASTNode | null {
     try {
       const keyword = this.peek();
-      
+
       if (keyword.type !== TokenType.KEYWORD) {
         return null;
       }
 
       switch (keyword.value) {
-        case 'LET':
+        case "LET":
           return this.parseLet();
-        case 'PRINT':
+        case "PRINT":
           return this.parsePrint();
-        case 'INPUT':
+        case "INPUT":
           return this.parseInput();
-        case 'IF':
+        case "IF":
           return this.parseIf();
-        case 'FOR':
+        case "FOR":
           return this.parseFor();
-        case 'DIM':
+        case "DIM":
           return this.parseDim();
-        case 'GOTO':
+        case "GOTO":
           return this.parseGoto();
-        case 'GOSUB':
+        case "GOSUB":
           return this.parseGosub();
-        case 'READ':
+        case "READ":
           return this.parseRead();
-        case 'DATA':
+        case "DATA":
           return this.parseData();
         default:
           return null;
@@ -570,96 +694,108 @@ export class ZXBasicParser {
   private parseLet(): ASTNode {
     this.consume(TokenType.KEYWORD); // LET
     const variable = this.consume(TokenType.IDENTIFIER);
-    this.consumeOperator('=');
+    this.consumeOperator("=");
     const expression = this.expression();
 
     return {
-      type: 'let_statement',
+      type: "let_statement",
       variable: variable.value,
-      expression
+      expression,
     };
   }
 
   private parsePrint(): ASTNode {
     this.consume(TokenType.KEYWORD); // PRINT
     const expressions: ASTNode[] = [];
-    
-    while (!this.isAtEnd() && this.peek().type !== TokenType.STATEMENT_SEPARATOR) {
+
+    while (
+      !this.isAtEnd() &&
+      this.peek().type !== TokenType.STATEMENT_SEPARATOR
+    ) {
       expressions.push(this.expression());
-      
-      if (this.peek().value === ';' || this.peek().value === ',') {
+
+      if (this.peek().value === ";" || this.peek().value === ",") {
         this.advance();
       } else {
         break;
       }
     }
-    
+
     return {
-      type: 'print_statement',
-      expressions
+      type: "print_statement",
+      expressions,
     };
   }
 
   private parseInput(): ASTNode {
     this.consume(TokenType.KEYWORD); // INPUT
     const variables: string[] = [];
-    
-    while (!this.isAtEnd() && this.peek().type !== TokenType.STATEMENT_SEPARATOR) {
+
+    while (
+      !this.isAtEnd() &&
+      this.peek().type !== TokenType.STATEMENT_SEPARATOR
+    ) {
       if (this.peek().type === TokenType.IDENTIFIER) {
         variables.push(this.advance().value);
       }
-      
-      if (this.peek().value === ',') {
+
+      if (this.peek().value === ",") {
         this.advance();
       } else {
         break;
       }
     }
-    
+
     return {
-      type: 'input_statement',
-      variables
+      type: "input_statement",
+      variables,
     };
   }
 
   private parseIf(): ASTNode {
     this.consume(TokenType.KEYWORD); // IF
     const condition = this.expression();
-    
-    if (this.peek().type === TokenType.KEYWORD && this.peek().value === 'THEN') {
+
+    if (
+      this.peek().type === TokenType.KEYWORD &&
+      this.peek().value === "THEN"
+    ) {
       this.consume(TokenType.KEYWORD); // THEN
       const statement = this.parseStatement();
-      
+
       return {
-        type: 'if_statement',
+        type: "if_statement",
         condition,
-        thenStatement: statement
+        thenStatement: statement,
       };
     }
-    
-    throw new Error('IF without THEN');
+
+    throw new Error("IF without THEN");
   }
 
   private parseFor(): ASTNode {
     this.consume(TokenType.KEYWORD); // FOR
     const variable = this.consume(TokenType.IDENTIFIER).value;
-    this.consumeOperator('=');
+    this.consumeOperator("=");
     const start = this.expression();
     this.consume(TokenType.KEYWORD); // TO
     const end = this.expression();
 
     let step = null;
-    if (this.peek().type === TokenType.KEYWORD && this.peek().value === 'STEP') {
+    if (
+      this.peek().type === TokenType.KEYWORD &&
+      this.peek().value === "STEP"
+    ) {
       this.consume(TokenType.KEYWORD); // STEP
       step = this.expression();
     }
 
     return {
-      type: 'for_statement',
+      type: "for_statement",
       variable,
       start,
       end,
-      step
+      step,
     };
   }
 
@@ -667,29 +803,32 @@ export class ZXBasicParser {
     this.consume(TokenType.KEYWORD); // DIM
     const arrays: Array<{ name: string; dimensions: ASTNode[] }> = [];
 
-    while (!this.isAtEnd() && this.peek().type !== TokenType.STATEMENT_SEPARATOR) {
+    while (
+      !this.isAtEnd() &&
+      this.peek().type !== TokenType.STATEMENT_SEPARATOR
+    ) {
       const name = this.consume(TokenType.IDENTIFIER).value;
       const dimensions: ASTNode[] = [];
 
-      if (this.peek().value === '(') {
-        this.consumePunctuation('(');
+      if (this.peek().value === "(") {
+        this.consumePunctuation("(");
 
-        while (this.peek().value !== ')') {
+        while (this.peek().value !== ")") {
           dimensions.push(this.expression());
 
-          if (this.peek().value === ',') {
+          if (this.peek().value === ",") {
             this.advance();
           } else {
             break;
           }
         }
 
-        this.consumePunctuation(')');
+        this.consumePunctuation(")");
       }
 
       arrays.push({ name, dimensions });
 
-      if (this.peek().value === ',') {
+      if (this.peek().value === ",") {
         this.advance();
       } else {
         break;
@@ -697,8 +836,8 @@ export class ZXBasicParser {
     }
 
     return {
-      type: 'dim_statement',
-      arrays
+      type: "dim_statement",
+      arrays,
     };
   }
 
@@ -707,8 +846,8 @@ export class ZXBasicParser {
     const lineNumber = this.consume(TokenType.NUMBER).value;
 
     return {
-      type: 'goto_statement',
-      lineNumber
+      type: "goto_statement",
+      lineNumber,
     };
   }
 
@@ -717,54 +856,60 @@ export class ZXBasicParser {
     const lineNumber = this.consume(TokenType.NUMBER).value;
 
     return {
-      type: 'gosub_statement',
-      lineNumber
+      type: "gosub_statement",
+      lineNumber,
     };
   }
 
   private parseRead(): ASTNode {
     this.consume(TokenType.KEYWORD); // READ
     const variables: string[] = [];
-    
-    while (!this.isAtEnd() && this.peek().type !== TokenType.STATEMENT_SEPARATOR) {
+
+    while (
+      !this.isAtEnd() &&
+      this.peek().type !== TokenType.STATEMENT_SEPARATOR
+    ) {
       if (this.peek().type === TokenType.IDENTIFIER) {
         variables.push(this.advance().value);
       }
-      
-      if (this.peek().value === ',') {
+
+      if (this.peek().value === ",") {
         this.advance();
       } else {
         break;
       }
     }
-    
+
     return {
-      type: 'read_statement',
-      variables
+      type: "read_statement",
+      variables,
     };
   }
 
   private parseData(): ASTNode {
     this.consume(TokenType.KEYWORD); // DATA
     const values: Array<string | number> = [];
-    
-    while (!this.isAtEnd() && this.peek().type !== TokenType.STATEMENT_SEPARATOR) {
+
+    while (
+      !this.isAtEnd() &&
+      this.peek().type !== TokenType.STATEMENT_SEPARATOR
+    ) {
       if (this.peek().type === TokenType.NUMBER) {
         values.push(parseFloat(this.advance().value));
       } else if (this.peek().type === TokenType.STRING) {
         values.push(this.advance().value);
       }
-      
-      if (this.peek().value === ',') {
+
+      if (this.peek().value === ",") {
         this.advance();
       } else {
         break;
       }
     }
-    
+
     return {
-      type: 'data_statement',
-      values
+      type: "data_statement",
+      values,
     };
   }
 
@@ -775,14 +920,17 @@ export class ZXBasicParser {
   private logicalOr(): ASTNode {
     let expr = this.logicalAnd();
 
-    while (this.peek().type === TokenType.KEYWORD && this.peek().value === 'OR') {
+    while (
+      this.peek().type === TokenType.KEYWORD &&
+      this.peek().value === "OR"
+    ) {
       this.advance();
       const right = this.logicalAnd();
       expr = {
-        type: 'binary_expr',
-        operator: 'OR',
+        type: "binary_expr",
+        operator: "OR",
         left: expr,
-        right
+        right,
       };
     }
 
@@ -792,14 +940,17 @@ export class ZXBasicParser {
   private logicalAnd(): ASTNode {
     let expr = this.equality();
 
-    while (this.peek().type === TokenType.KEYWORD && this.peek().value === 'AND') {
+    while (
+      this.peek().type === TokenType.KEYWORD &&
+      this.peek().value === "AND"
+    ) {
       this.advance();
       const right = this.equality();
       expr = {
-        type: 'binary_expr',
-        operator: 'AND',
+        type: "binary_expr",
+        operator: "AND",
         left: expr,
-        right
+        right,
       };
     }
 
@@ -809,15 +960,18 @@ export class ZXBasicParser {
   private equality(): ASTNode {
     let expr = this.comparison();
 
-    while (this.peek().type === TokenType.OPERATOR && (this.peek().value === '=' || this.peek().value === '<>')) {
+    while (
+      this.peek().type === TokenType.OPERATOR &&
+      (this.peek().value === "=" || this.peek().value === "<>")
+    ) {
       this.advance();
       const operator = this.previous().value;
       const right = this.comparison();
       expr = {
-        type: 'binary_expr',
+        type: "binary_expr",
         operator,
         left: expr,
-        right
+        right,
       };
     }
 
@@ -827,15 +981,21 @@ export class ZXBasicParser {
   private comparison(): ASTNode {
     let expr = this.term();
 
-    while (this.peek().type === TokenType.OPERATOR && (this.peek().value === '<' || this.peek().value === '>' || this.peek().value === '<=' || this.peek().value === '>=')) {
+    while (
+      this.peek().type === TokenType.OPERATOR &&
+      (this.peek().value === "<" ||
+        this.peek().value === ">" ||
+        this.peek().value === "<=" ||
+        this.peek().value === ">=")
+    ) {
       this.advance();
       const operator = this.previous().value;
       const right = this.term();
       expr = {
-        type: 'binary_expr',
+        type: "binary_expr",
         operator,
         left: expr,
-        right
+        right,
       };
     }
 
@@ -845,15 +1005,18 @@ export class ZXBasicParser {
   private term(): ASTNode {
     let expr = this.factor();
 
-    while (this.peek().type === TokenType.OPERATOR && (this.peek().value === '+' || this.peek().value === '-')) {
+    while (
+      this.peek().type === TokenType.OPERATOR &&
+      (this.peek().value === "+" || this.peek().value === "-")
+    ) {
       this.advance();
       const operator = this.previous().value;
       const right = this.factor();
       expr = {
-        type: 'binary_expr',
+        type: "binary_expr",
         operator,
         left: expr,
-        right
+        right,
       };
     }
 
@@ -863,15 +1026,20 @@ export class ZXBasicParser {
   private factor(): ASTNode {
     let expr = this.unary();
 
-    while (this.peek().type === TokenType.OPERATOR && (this.peek().value === '*' || this.peek().value === '/' || this.peek().value === '^')) {
+    while (
+      this.peek().type === TokenType.OPERATOR &&
+      (this.peek().value === "*" ||
+        this.peek().value === "/" ||
+        this.peek().value === "^")
+    ) {
       this.advance();
       const operator = this.previous().value;
       const right = this.unary();
       expr = {
-        type: 'binary_expr',
+        type: "binary_expr",
         operator,
         left: expr,
-        right
+        right,
       };
     }
 
@@ -879,25 +1047,25 @@ export class ZXBasicParser {
   }
 
   private unary(): ASTNode {
-    if (this.peek().type === TokenType.OPERATOR && this.peek().value === '-') {
+    if (this.peek().type === TokenType.OPERATOR && this.peek().value === "-") {
       this.advance();
       const operator = this.previous().value;
       const operand = this.unary();
       return {
-        type: 'unary_expr',
+        type: "unary_expr",
         operator,
-        operand
+        operand,
       };
     }
 
     // Check for NOT keyword
-    if (this.peek().type === TokenType.KEYWORD && this.peek().value === 'NOT') {
+    if (this.peek().type === TokenType.KEYWORD && this.peek().value === "NOT") {
       this.advance();
       const operand = this.unary();
       return {
-        type: 'unary_expr',
-        operator: 'NOT',
-        operand
+        type: "unary_expr",
+        operator: "NOT",
+        operand,
       };
     }
 
@@ -907,59 +1075,80 @@ export class ZXBasicParser {
   private primary(): ASTNode {
     if (this.match(TokenType.NUMBER, TokenType.LINE_NUMBER)) {
       return {
-        type: 'number',
-        value: this.previous().value
+        type: "number",
+        value: this.previous().value,
       };
     }
 
     if (this.match(TokenType.STRING)) {
       return {
-        type: 'string',
-        value: this.previous().value
+        type: "string",
+        value: this.previous().value,
       };
     }
 
     if (this.match(TokenType.IDENTIFIER, TokenType.KEYWORD)) {
       const name = this.previous().value;
-      if (this.peek().type === TokenType.PUNCTUATION && this.peek().value === '(') {
+      if (
+        this.peek().type === TokenType.PUNCTUATION &&
+        this.peek().value === "("
+      ) {
         // Function call
         this.advance();
         const args: ASTNode[] = [];
-        if (!(this.peek().type === TokenType.PUNCTUATION && this.peek().value === ')')) {
+        if (
+          !(
+            this.peek().type === TokenType.PUNCTUATION &&
+            this.peek().value === ")"
+          )
+        ) {
           do {
             args.push(this.expression());
-          } while (this.peek().type === TokenType.PUNCTUATION && this.peek().value === ',' && this.advance());
+          } while (
+            this.peek().type === TokenType.PUNCTUATION &&
+            this.peek().value === "," &&
+            this.advance()
+          );
         }
-        if (this.peek().type === TokenType.PUNCTUATION && this.peek().value === ')') {
+        if (
+          this.peek().type === TokenType.PUNCTUATION &&
+          this.peek().value === ")"
+        ) {
           this.advance();
         } else {
-          throw new Error('Expected )');
+          throw new Error("Expected )");
         }
         return {
-          type: 'function',
+          type: "function",
           name,
-          args
+          args,
         };
       } else {
         return {
-          type: 'identifier',
-          name
+          type: "identifier",
+          name,
         };
       }
     }
 
-    if (this.peek().type === TokenType.PUNCTUATION && this.peek().value === '(') {
+    if (
+      this.peek().type === TokenType.PUNCTUATION &&
+      this.peek().value === "("
+    ) {
       this.advance();
       const expr = this.expression();
-      if (this.peek().type === TokenType.PUNCTUATION && this.peek().value === ')') {
+      if (
+        this.peek().type === TokenType.PUNCTUATION &&
+        this.peek().value === ")"
+      ) {
         this.advance();
       } else {
-        throw new Error('Expected )');
+        throw new Error("Expected )");
       }
       return expr;
     }
 
-    throw new Error('Invalid expression');
+    throw new Error("Invalid expression");
   }
 
   private match(...types: TokenType[]): boolean {
@@ -977,7 +1166,9 @@ export class ZXBasicParser {
   }
 
   private isAtEnd(): boolean {
-    return this.current >= this.tokens.length || this.peek().type === TokenType.EOF;
+    return (
+      this.current >= this.tokens.length || this.peek().type === TokenType.EOF
+    );
   }
 
   private advance(): Token {

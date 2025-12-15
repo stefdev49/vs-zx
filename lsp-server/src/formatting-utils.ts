@@ -336,6 +336,11 @@ export function formatLine(
         prevToken.type === TokenType.STATEMENT_SEPARATOR
       ) {
         formatted += " ";
+      } else if (
+        prevToken.type === TokenType.NUMBER &&
+        token.type === TokenType.KEYWORD
+      ) {
+        formatted += " ";
       }
     }
 
@@ -382,7 +387,7 @@ export function getWordBeforePosition(
   let start = position - 1;
 
   // Walk backwards to find word start
-  while (start >= 0 && /[A-Za-z0-9_]/.test(lineText[start])) {
+  while (start >= 0 && /[A-Za-z0-9]/.test(lineText[start])) {
     start--;
   }
 
@@ -488,13 +493,13 @@ function getContextAtPosition(
 
   // Patterns where we should NOT uppercase (variable contexts)
   const variablePatterns = [
-    /DIM\s+[A-Za-z0-9_]+\s*$/i, // After DIM
-    /LET\s+[A-Za-z0-9_]+\s*=\s*[^=]*$/i, // After LET variable =
-    /INPUT\s+[A-Za-z0-9_]+\s*$/i, // After INPUT
-    /READ\s+[A-Za-z0-9_]+\s*$/i, // After READ
-    /\b[A-Za-z0-9_]+\s*=\s*[^=]*$/i, // After any assignment
-    /\(\s*[A-Za-z0-9_]+\s*$/i, // Inside function calls
-    /\b[A-Za-z0-9_]+\s*\(/i, // Before function parameters
+    /DIM\s+[A-Za-z0-9]+\s*$/i, // After DIM
+    /LET\s+[A-Za-z0-9]+\s*=\s*[^=]*$/i, // After LET variable =
+    /INPUT\s+[A-Za-z0-9]+\s*$/i, // After INPUT
+    /READ\s+[A-Za-z0-9]+\s*$/i, // After READ
+    /\b[A-Za-z0-9]+\s*=\s*[^=]*$/i, // After any assignment
+    /\(\s*[A-Za-z0-9]+\s*$/i, // Inside function calls
+    /\b[A-Za-z0-9]+\s*\(/i, // Before function parameters
   ];
 
   return {

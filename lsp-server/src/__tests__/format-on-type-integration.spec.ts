@@ -143,10 +143,11 @@ describe("Format-on-Type Integration Tests", () => {
         .tokenize(line)
         .filter((t) => t.type !== TokenType.EOF);
 
-      // Should have FOR, i, =, 0, TO, 255 tokens
-      expect(tokens.length).toBe(6);
-      expect(tokens[0].value).toBe("FOR");
-      expect(tokens[4].value).toBe("TO");
+      // Should have 80, FOR, i, =, 0, TO, 255 tokens
+      expect(tokens.length).toBe(7);
+      expect(tokens[0].value).toBe("80");
+      expect(tokens[1].value).toBe("FOR");
+      expect(tokens[5].value).toBe("TO");
     });
 
     it("should preserve variable case in mixed scenarios", () => {

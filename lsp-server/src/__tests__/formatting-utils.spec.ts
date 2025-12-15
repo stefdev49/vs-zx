@@ -1,13 +1,13 @@
-import { TextDocument } from 'vscode-languageserver-textdocument';
-import { autoRenumberLines, formatLine } from '../formatting-utils';
-import { ZXBasicLexer, TokenType } from '../zxbasic';
+import { TextDocument } from "vscode-languageserver-textdocument";
+import { autoRenumberLines, formatLine } from "../formatting-utils";
+import { ZXBasicLexer, TokenType } from "../zxbasic";
 
 function createDocument(contents: string): TextDocument {
-  return TextDocument.create('file:///test.bas', 'zx-basic', 1, contents);
+  return TextDocument.create("file:///test.bas", "zx-basic", 1, contents);
 }
 
-describe('autoRenumberLines', () => {
-  it('renumbers sequential lines and updates GOTO targets', () => {
+describe("autoRenumberLines", () => {
+  it("renumbers sequential lines and updates GOTO targets", () => {
     const doc = createDocument('300 PRINT "HELLO"\n450 GO TO 300\n');
 
     const result = autoRenumberLines(doc);
@@ -15,16 +15,20 @@ describe('autoRenumberLines', () => {
     expect(result.mappedLineCount).toBe(2);
     expect(result.edits).toHaveLength(2);
 
-    const firstLineEdit = result.edits.find(edit => edit.range.start.line === 0);
-    const secondLineEdit = result.edits.find(edit => edit.range.start.line === 1);
+    const firstLineEdit = result.edits.find(
+      (edit) => edit.range.start.line === 0,
+    );
+    const secondLineEdit = result.edits.find(
+      (edit) => edit.range.start.line === 1,
+    );
 
     expect(firstLineEdit?.newText).toBe('10 PRINT "HELLO"');
-    expect(secondLineEdit?.newText).toBe('20 GOTO 10');
+    expect(secondLineEdit?.newText).toBe("20 GOTO 10");
 
     expect(Array.from(result.touchedLines.values()).sort()).toEqual([0, 1]);
   });
 
-  it('adds missing line numbers while preserving untouched lines', () => {
+  it("adds missing line numbers while preserving untouched lines", () => {
     const doc = createDocument('PRINT "NO NUM"\n20 GOTO 20\n');
 
     const result = autoRenumberLines(doc);
@@ -32,49 +36,90 @@ describe('autoRenumberLines', () => {
     expect(result.mappedLineCount).toBe(1);
     expect(result.edits).toHaveLength(2);
 
-    const firstLine = result.edits.find(edit => edit.range.start.line === 0);
-    const secondLine = result.edits.find(edit => edit.range.start.line === 1);
+    const firstLine = result.edits.find((edit) => edit.range.start.line === 0);
+    const secondLine = result.edits.find((edit) => edit.range.start.line === 1);
 
     expect(firstLine?.newText).toBe('10 PRINT "NO NUM"');
-    expect(secondLine?.newText).toBe('20 GOTO 20');
+    expect(secondLine?.newText).toBe("20 GOTO 20");
   });
 });
 
-describe('formatLine', () => {
+describe("formatLine", () => {
   const lexer = new ZXBasicLexer();
 
-  it('should uppercase REM keywords in comments', () => {
-    const doc = createDocument('10 rem test comment');
-    const tokens = lexer.tokenize('10 rem test comment').filter(t => t.type !== TokenType.EOF);
+  it("should uppercase REM keywords in comments", () => {
+    const doc = createDocument("10 rem test comment");
+    const tokens = lexer
+      .tokenize("10 rem test comment")
+      .filter((t) => t.type !== TokenType.EOF);
     const result = formatLine(tokens, doc);
-    
+
     expect(result).not.toBeNull();
-    expect(result?.newText).toBe('10 REM test comment');
+    expect(result?.newText).toBe("10 REM test comment");
   });
 
-  it('should preserve already uppercase REM keywords', () => {
-    const doc = createDocument('20 REM TEST COMMENT');
-    const tokens = lexer.tokenize('20 REM TEST COMMENT').filter(t => t.type !== TokenType.EOF);
+  it("should preserve already uppercase REM keywords", () => {
+    const doc = createDocument("20 REM TEST COMMENT");
+    const tokens = lexer
+      .tokenize("20 REM TEST COMMENT")
+      .filter((t) => t.type !== TokenType.EOF);
     const result = formatLine(tokens, doc);
-    
+
     expect(result).toBeNull(); // No changes needed
   });
 
-  it('should handle mixed case REM keywords', () => {
-    const doc = createDocument('30 Rem Mixed Case');
-    const tokens = lexer.tokenize('30 Rem Mixed Case').filter(t => t.type !== TokenType.EOF);
+  it("should handle mixed case REM keywords", () => {
+    const doc = createDocument("30 Rem Mixed Case");
+    const tokens = lexer
+      .tokenize("30 Rem Mixed Case")
+      .filter((t) => t.type !== TokenType.EOF);
     const result = formatLine(tokens, doc);
-    
+
     expect(result).not.toBeNull();
-    expect(result?.newText).toBe('30 REM Mixed Case');
+    expect(result?.newText).toBe("30 REM Mixed Case");
   });
 
-  it('should uppercase regular keywords', () => {
+  it("should uppercase regular keywords", () => {
     const doc = createDocument('40 print "hello"');
-    const tokens = lexer.tokenize('40 print "hello"').filter(t => t.type !== TokenType.EOF);
+    const tokens = lexer
+      .tokenize('40 print "hello"')
+      .filter((t) => t.type !== TokenType.EOF);
     const result = formatLine(tokens, doc);
-    
+
     expect(result).not.toBeNull();
     expect(result?.newText).toBe('40 PRINT "hello"');
+  });
+
+  it("should format FOR statements correctly", () => {
+    const doc = createDocument("50 for i=1 to 255");
+    const tokens = lexer
+      .tokenize("50 for i=1 to 255")
+      .filter((t) => t.type !== TokenType.EOF);
+    const result = formatLine(tokens, doc);
+
+    expect(result).not.toBeNull();
+    expect(result?.newText).toBe("50 FOR I = 1 TO 255");
+  });
+
+  it("should format FOR statements with STEP correctly", () => {
+    const doc = createDocument("60 for j=10 to 100 step 5");
+    const tokens = lexer
+      .tokenize("60 for j=10 to 100 step 5")
+      .filter((t) => t.type !== TokenType.EOF);
+    const result = formatLine(tokens, doc);
+
+    expect(result).not.toBeNull();
+    expect(result?.newText).toBe("60 FOR J = 10 TO 100 STEP 5");
+  });
+
+  it("should handle numbers followed by keywords in other contexts", () => {
+    const doc = createDocument('70 if x=5 then print "hello"');
+    const tokens = lexer
+      .tokenize('70 if x=5 then print "hello"')
+      .filter((t) => t.type !== TokenType.EOF);
+    const result = formatLine(tokens, doc);
+
+    expect(result).not.toBeNull();
+    expect(result?.newText).toBe('70 IF X = 5 THEN PRINT "hello"');
   });
 });
