@@ -1,4 +1,4 @@
-import { window, commands, ExtensionContext, TextEdit } from "vscode";
+import { window, commands, ExtensionContext, TextEdit } from 'vscode';
 import {
   getCurrentDocument,
   getSelectionRange,
@@ -7,38 +7,38 @@ import {
   getLastLineNumber,
   generateUniqueVariableName,
   removeLineNumbers,
-} from "./refactorUtils";
+} from './refactorUtils';
 
 export function extractSubroutine() {
   const document = getCurrentDocument();
   if (!document) {
-    window.showErrorMessage("No active ZX BASIC document found");
+    window.showErrorMessage('No active ZX BASIC document found');
     return;
   }
 
-  if (document.languageId !== "zx-basic") {
+  if (document.languageId !== 'zx-basic') {
     window.showErrorMessage(
-      "Extract Subroutine is only available for ZX BASIC files",
+      'Extract Subroutine is only available for ZX BASIC files',
     );
     return;
   }
 
   const editor = window.activeTextEditor;
   if (!editor) {
-    window.showErrorMessage("No active editor found");
+    window.showErrorMessage('No active editor found');
     return;
   }
 
   const selectionRange = getSelectionRange(document);
   if (!selectionRange) {
-    window.showErrorMessage("No text selected for subroutine extraction");
+    window.showErrorMessage('No text selected for subroutine extraction');
     return;
   }
 
   // Get selected text
   const selectedText = document.getText(selectionRange);
-  if (!selectedText || selectedText.trim() === "") {
-    window.showErrorMessage("Selected text is empty or invalid");
+  if (!selectedText || selectedText.trim() === '') {
+    window.showErrorMessage('Selected text is empty or invalid');
     return;
   }
 
@@ -51,7 +51,7 @@ export function extractSubroutine() {
   );
 
   // Generate subroutine name
-  const subroutineName = generateUniqueVariableName("SUB", document);
+  const subroutineName = generateUniqueVariableName('SUB', document);
 
   // Calculate line numbers for the subroutine
   const remLineNumber = subroutineLineNumber;
@@ -62,8 +62,8 @@ export function extractSubroutine() {
 
   // Calculate return line number based on number of lines in extracted code
   const extractedLines = cleanedText
-    .split("\n")
-    .filter((line) => line.trim() !== "");
+    .split('\n')
+    .filter((line) => line.trim() !== '');
   const returnLineNumber = codeLineNumber + extractedLines.length * 10;
 
   // Add line numbers to each line of the extracted code with proper sequencing
@@ -76,7 +76,7 @@ export function extractSubroutine() {
   // Create subroutine text
   const subroutineText = `
 ${remLineNumber} REM Subroutine ${subroutineName}
-${linesWithNumbers.join("\n")}
+${linesWithNumbers.join('\n')}
 ${returnLineNumber} RETURN`;
 
   // Create GOSUB call with line number
@@ -119,14 +119,14 @@ ${returnLineNumber} RETURN`;
           `Extracted subroutine ${subroutineName} at line ${subroutineLineNumber}`,
         );
       } else {
-        window.showErrorMessage("Failed to extract subroutine");
+        window.showErrorMessage('Failed to extract subroutine');
       }
     });
 }
 
-export function register(): ExtensionContext["subscriptions"][0] {
+export function register(): ExtensionContext['subscriptions'][0] {
   return commands.registerCommand(
-    "zx-basic.extractSubroutine",
+    'zx-basic.extractSubroutine',
     extractSubroutine,
   );
 }

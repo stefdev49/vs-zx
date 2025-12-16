@@ -72,6 +72,18 @@
         "command": "zx-basic.extractSubroutine",
         "title": "Extract Subroutine",
         "category": "ZX BASIC Refactoring"
+      },
+      {
+        "command": "zx-basic.recordFromZx",
+        "title": "Record from ZX Spectrum",
+        "category": "ZX BASIC",
+        "icon": "$(mic)"
+      },
+      {
+        "command": "zx-basic.stopZxRecording",
+        "title": "Stop ZX Recording",
+        "category": "ZX BASIC",
+        "icon": "$(debug-stop)"
       }
     ],
     "menus": {
@@ -102,6 +114,13 @@
         {
           "command": "zx-basic.extractSubroutine",
           "when": "editorLangId == zx-basic"
+        },
+        {
+          "command": "zx-basic.recordFromZx",
+          "when": "editorLangId == zx-basic"
+        },
+        {
+          "command": "zx-basic.stopZxRecording"
         }
       ],
       "editor/title": [
@@ -238,6 +257,31 @@
             "type": "boolean",
             "default": false,
             "description": "Generate soft sine pulses instead of square pulses"
+          },
+          "zxBasic.recordFromZx": {
+            "type": "object",
+            "default": {
+              "tzxwavPath": "tzxwav",
+              "recordingDuration": 0,
+              "outputDirectory": "${workspaceFolder}/recordings"
+            },
+            "properties": {
+              "zxBasic.recordFromZx.tzxwavPath": {
+                "type": "string",
+                "default": "tzxwav",
+                "description": "Path to tzxwav executable for audio recording conversion"
+              },
+              "zxBasic.recordFromZx.recordingDuration": {
+                "type": "number",
+                "default": 0,
+                "description": "Recording duration in seconds (0 for manual stop)"
+              },
+              "zxBasic.recordFromZx.outputDirectory": {
+                "type": "string",
+                "default": "${workspaceFolder}/recordings",
+                "description": "Directory to save recorded BASIC programs"
+              }
+            }
           }
         }
       }
@@ -248,7 +292,9 @@
     "onCommand:zx-basic.transfer",
     "onCommand:zx-basic.saveAsTzx",
     "onCommand:zx-basic.playToZx",
-    "onCommand:zx-basic.stopTzxPlayback"
+    "onCommand:zx-basic.stopTzxPlayback",
+    "onCommand:zx-basic.recordFromZx",
+    "onCommand:zx-basic.stopZxRecording"
   ],
   "main": "./out/extension.js",
   "scripts": {

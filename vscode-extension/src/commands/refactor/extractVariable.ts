@@ -1,4 +1,4 @@
-import { window, commands, ExtensionContext, Position, TextEdit } from "vscode";
+import { window, commands, ExtensionContext, Position, TextEdit } from 'vscode';
 import {
   getCurrentDocument,
   getSelectionRange,
@@ -7,38 +7,38 @@ import {
   inferVariableType,
   isValidExpression,
   getLineNumberAtPosition,
-} from "./refactorUtils";
+} from './refactorUtils';
 
 export function extractVariable() {
   const document = getCurrentDocument();
   if (!document) {
-    window.showErrorMessage("No active ZX BASIC document found");
+    window.showErrorMessage('No active ZX BASIC document found');
     return;
   }
 
-  if (document.languageId !== "zx-basic") {
+  if (document.languageId !== 'zx-basic') {
     window.showErrorMessage(
-      "Extract Variable is only available for ZX BASIC files",
+      'Extract Variable is only available for ZX BASIC files',
     );
     return;
   }
 
   const editor = window.activeTextEditor;
   if (!editor) {
-    window.showErrorMessage("No active editor found");
+    window.showErrorMessage('No active editor found');
     return;
   }
 
   const selectionRange = getSelectionRange(document);
   if (!selectionRange) {
-    window.showErrorMessage("No text selected");
+    window.showErrorMessage('No text selected');
     return;
   }
 
   const selectedText = document.getText(selectionRange);
   if (!isValidExpression(selectedText)) {
     window.showErrorMessage(
-      "Selected text is not a valid expression for variable extraction",
+      'Selected text is not a valid expression for variable extraction',
     );
     return;
   }
@@ -54,13 +54,13 @@ export function extractVariable() {
 
   // Infer variable type and generate name
   const varType = inferVariableType(selectedText);
-  const baseName = "result";
+  const baseName = 'result';
   const varName = generateUniqueVariableName(baseName, document);
   const fullVarName = varName + varType.suffix;
 
   // Create the LET statement with line number and proper spacing
   // Ensure there's a space after LET and around operators
-  const spacedExpression = selectedText.trim().replace(/([+\-*/()])/g, " $1 ");
+  const spacedExpression = selectedText.trim().replace(/([+\-*/()])/g, ' $1 ');
   const letStatement = `${newLineNumber} LET ${fullVarName} = ${spacedExpression.trim()}`;
 
   // Create text edits
@@ -80,19 +80,19 @@ export function extractVariable() {
   let replacement = fullVarName;
   if (
     textBefore.trim().length > 0 &&
-    !textBefore.endsWith(" ") &&
-    !textBefore.endsWith("=")
+    !textBefore.endsWith(' ') &&
+    !textBefore.endsWith('=')
   ) {
-    replacement = " " + replacement;
+    replacement = ' ' + replacement;
   }
 
   // Add space after variable if needed
   if (
     textAfter.trim().length > 0 &&
-    !textAfter.startsWith(" ") &&
-    !textAfter.startsWith("\n")
+    !textAfter.startsWith(' ') &&
+    !textAfter.startsWith('\n')
   ) {
-    replacement = replacement + " ";
+    replacement = replacement + ' ';
   }
 
   edits.push(TextEdit.replace(selectionRange, replacement));
@@ -110,11 +110,11 @@ export function extractVariable() {
           `Extracted expression to variable ${fullVarName}`,
         );
       } else {
-        window.showErrorMessage("Failed to extract variable");
+        window.showErrorMessage('Failed to extract variable');
       }
     });
 }
 
-export function register(): ExtensionContext["subscriptions"][0] {
-  return commands.registerCommand("zx-basic.extractVariable", extractVariable);
+export function register(): ExtensionContext['subscriptions'][0] {
+  return commands.registerCommand('zx-basic.extractVariable', extractVariable);
 }

@@ -5,56 +5,56 @@ import {
   TextDocument,
   TextEdit,
   Range,
-} from "vscode";
-import { getCurrentDocument } from "./refactorUtils";
+} from 'vscode';
+import { getCurrentDocument } from './refactorUtils';
 
 export function renumberLines() {
   const document = getCurrentDocument();
   if (!document) {
-    window.showErrorMessage("No active ZX BASIC document found");
+    window.showErrorMessage('No active ZX BASIC document found');
     return;
   }
 
-  if (document.languageId !== "zx-basic") {
+  if (document.languageId !== 'zx-basic') {
     window.showErrorMessage(
-      "Line Renumbering is only available for ZX BASIC files",
+      'Line Renumbering is only available for ZX BASIC files',
     );
     return;
   }
 
   const editor = window.activeTextEditor;
   if (!editor) {
-    window.showErrorMessage("No active editor found");
+    window.showErrorMessage('No active editor found');
     return;
   }
 
   // Show options for renumbering
   const options = [
-    "Increment by 10",
-    "Increment by 20",
-    "Increment by 50",
-    "Increment by 100",
-    "Custom...",
+    'Increment by 10',
+    'Increment by 20',
+    'Increment by 50',
+    'Increment by 100',
+    'Custom...',
   ];
 
   window
     .showQuickPick(options, {
-      placeHolder: "Select line number increment strategy",
+      placeHolder: 'Select line number increment strategy',
     })
     .then((selectedOption) => {
       if (!selectedOption) return;
 
       let increment: number;
-      if (selectedOption === "Custom...") {
+      if (selectedOption === 'Custom...') {
         // Ask for custom increment
         window
           .showInputBox({
-            prompt: "Enter custom increment value (e.g., 15, 25, 100)",
-            value: "10",
+            prompt: 'Enter custom increment value (e.g., 15, 25, 100)',
+            value: '10',
             validateInput: (value) => {
               const num = parseInt(value);
               if (isNaN(num) || num <= 0 || num > 1000) {
-                return "Please enter a valid number between 1 and 1000";
+                return 'Please enter a valid number between 1 and 1000';
               }
               return null;
             },
@@ -65,7 +65,7 @@ export function renumberLines() {
             performRenumbering(document, editor, increment);
           });
       } else {
-        increment = parseInt(selectedOption.match(/\d+/)?.[0] || "10");
+        increment = parseInt(selectedOption.match(/\d+/)?.[0] || '10');
         performRenumbering(document, editor, increment);
       }
     });
@@ -77,7 +77,7 @@ function performRenumbering(
   increment: number,
 ) {
   const text = document.getText();
-  const lines = text.split("\n");
+  const lines = text.split('\n');
   const edits: TextEdit[] = [];
 
   // Parse all line numbers and their positions
@@ -100,7 +100,7 @@ function performRenumbering(
   }
 
   if (lineNumbers.length === 0) {
-    window.showInformationMessage("No line numbers found to renumber");
+    window.showInformationMessage('No line numbers found to renumber');
     return;
   }
 
@@ -143,7 +143,7 @@ function performRenumbering(
 
       if (newTarget) {
         let startPos = match.index + match[1].length;
-        while (startPos < line.length && line[startPos] === " ") {
+        while (startPos < line.length && line[startPos] === ' ') {
           startPos++;
         }
 
@@ -171,11 +171,11 @@ function performRenumbering(
           `Renumbered ${lineNumbers.length} lines with increment ${increment}`,
         );
       } else {
-        window.showErrorMessage("Failed to renumber lines");
+        window.showErrorMessage('Failed to renumber lines');
       }
     });
 }
 
-export function register(): ExtensionContext["subscriptions"][0] {
-  return commands.registerCommand("zx-basic.renumberLines", renumberLines);
+export function register(): ExtensionContext['subscriptions'][0] {
+  return commands.registerCommand('zx-basic.renumberLines', renumberLines);
 }
