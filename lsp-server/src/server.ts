@@ -349,7 +349,7 @@ documents.onDidChangeContent((change) => {
 });
 
 // Validate document and report diagnostics
-async function validateTextDocument(
+export async function validateTextDocument(
   textDocument: TextDocument,
 ): Promise<Diagnostic[]> {
   const settings = await getDocumentSettings(textDocument.uri);
@@ -435,29 +435,31 @@ async function validateTextDocument(
             }
           }
         }
+      }
 
-        // Check if this is used in DIM context (array variable)
-        if (tokenIndex < tokens.length - 1) {
-          const prevToken = tokens[tokenIndex - 1];
-          const nextToken = tokens[tokenIndex + 1];
+      // Check if this is used in DIM context (array variable) - applies to all variable types
+      if (tokenIndex < tokens.length - 1) {
+        const prevToken = tokens[tokenIndex - 1];
+        const nextToken = tokens[tokenIndex + 1];
 
-          if (
-            prevToken &&
-            prevToken.value === "DIM" &&
-            nextToken &&
-            nextToken.value === "("
-          ) {
-            if (variableName.length !== 1) {
-              diagnostics.push({
-                severity: DiagnosticSeverity.Error,
-                range: {
-                  start: { line: token.line, character: token.start },
-                  end: { line: token.line, character: token.end },
-                },
-                message: `Array variable name must be exactly 1 character long (e.g., A), but found '${variableName}'`,
-                source: "zx-basic-lsp",
-              });
-            }
+        if (
+          prevToken &&
+          prevToken.value === "DIM" &&
+          nextToken &&
+          nextToken.value === "("
+        ) {
+          // Extract base name without type suffix for validation
+          const baseName = variableName.replace(/[$%]$/, "");
+          if (baseName.length !== 1) {
+            diagnostics.push({
+              severity: DiagnosticSeverity.Error,
+              range: {
+                start: { line: token.line, character: token.start },
+                end: { line: token.line, character: token.end },
+              },
+              message: `Array variable name must be exactly 1 character long (e.g., A), but found '${variableName}'`,
+              source: "zx-basic-lsp",
+            });
           }
         }
       }
@@ -962,8 +964,10 @@ async function validateTextDocument(
             }
 
             // Store the declaration (use base name without $/%)
-            if (!dimDeclarations.has(arrayName)) {
-              dimDeclarations.set(arrayName, {
+            // Note: We need to handle the case where both m and m$ exist
+            const declarationKey = isStringArray ? `${arrayName}$` : arrayName;
+            if (!dimDeclarations.has(declarationKey)) {
+              dimDeclarations.set(declarationKey, {
                 line: idToken.line,
                 dimensions: declaredDimensions,
                 isString: isStringArray,
@@ -985,9 +989,18 @@ async function validateTextDocument(
     if (token.type === TokenType.IDENTIFIER) {
       const arrayName = token.value.replace(/[$%]$/, "");
       const isStringVariable = token.value.endsWith("$");
+      const declarationKey = isStringVariable ? `${arrayName}$` : arrayName;
 
       // Check if followed by parentheses (array usage or string slicing)
       if (i + 1 < tokens.length && tokens[i + 1].value === "(") {
+        // Skip if this is part of a DEF FN definition or FN call
+        const prevToken = i > 0 ? tokens[i - 1] : null;
+        if (
+          prevToken &&
+          (prevToken.value === "DEFFN" || prevToken.value === "FN")
+        ) {
+          continue; // Skip DEF FN and FN contexts
+        }
         // Count dimensions in this usage and detect TO keyword for string slicing
         let usedDimensions = 0;
         let hasToKeyword = false;
@@ -1039,10 +1052,10 @@ async function validateTextDocument(
         }
 
         // Track usage
-        if (!arrayUsages.has(arrayName)) {
-          arrayUsages.set(arrayName, []);
+        if (!arrayUsages.has(declarationKey)) {
+          arrayUsages.set(declarationKey, []);
         }
-        arrayUsages.get(arrayName)!.push({
+        arrayUsages.get(declarationKey)!.push({
           line: token.line,
           usedDimensions,
           isString: isStringVariable,
@@ -1052,19 +1065,23 @@ async function validateTextDocument(
   }
 
   // Check for mismatches between DIM and usage
-  arrayUsages.forEach((usages, arrayName) => {
-    const declaration = dimDeclarations.get(arrayName);
+  arrayUsages.forEach((usages, usageKey) => {
+    const declaration = dimDeclarations.get(usageKey);
 
     if (!declaration) {
       // Array used but not declared with DIM
       usages.forEach((usage) => {
+        // Extract the display name (remove $ from key if present)
+        const displayName = usageKey.endsWith("$")
+          ? usageKey.slice(0, -1) + "$"
+          : usageKey;
         diagnostics.push({
           severity: DiagnosticSeverity.Warning,
           range: {
             start: { line: usage.line, character: 0 },
-            end: { line: usage.line, character: arrayName.length },
+            end: { line: usage.line, character: displayName.length },
           },
-          message: `Array '${arrayName}' used but not declared with DIM`,
+          message: `Array '${displayName}' used but not declared with DIM`,
           source: "zx-basic-lsp",
         });
       });
@@ -1075,15 +1092,25 @@ async function validateTextDocument(
         const declaredDims = declaration.dimensions;
         const usedDims = usage.usedDimensions;
 
-        // Special case: String arrays can have one extra parameter for character position access
-        // e.g., DIM a$(10,20) declares 1D array, a$(5,10) accesses element 5, character 10
+        // Special cases for string arrays:
+        // 1. String arrays can have one extra parameter for character position access
+        //    e.g., DIM a$(10,20) declares 1D array, a$(5,10) accesses element 5, character 10
+        // 2. String arrays can be accessed with fewer dimensions than declared
+        //    e.g., DIM a$(10,20) can be used as a$(5) to access the full string
         const isValidStringSlicing =
           declaration.isString &&
           usage.isString &&
           usedDims === declaredDims + 1;
 
-        if (usedDims !== declaredDims && !isValidStringSlicing) {
-          let message = `Array '${arrayName}' declared with ${declaredDims} dimension(s) but used with ${usedDims}`;
+        const isValidStringUnderuse =
+          declaration.isString && usage.isString && usedDims < declaredDims;
+
+        if (
+          usedDims !== declaredDims &&
+          !isValidStringSlicing &&
+          !isValidStringUnderuse
+        ) {
+          let message = `Array '${usageKey}' declared with ${declaredDims} dimension(s) but used with ${usedDims}`;
 
           if (declaration.isString && usedDims === declaredDims + 1) {
             // This shouldn't happen due to isValidStringSlicing check, but kept for safety
@@ -1097,7 +1124,7 @@ async function validateTextDocument(
             severity: DiagnosticSeverity.Warning,
             range: {
               start: { line: usage.line, character: 0 },
-              end: { line: usage.line, character: arrayName.length },
+              end: { line: usage.line, character: usageKey.length },
             },
             message: message,
             source: "zx-basic-lsp",
