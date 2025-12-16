@@ -378,6 +378,91 @@ async function validateTextDocument(
       });
     }
 
+    // Validate variable names according to ZX BASIC rules
+    if (token.type === TokenType.IDENTIFIER) {
+      const variableName = token.value;
+      const tokenIndex = tokens.indexOf(token);
+
+      // Check if this is a string variable (ends with $)
+      if (variableName.endsWith("$")) {
+        const baseName = variableName.slice(0, -1);
+        if (baseName.length !== 1) {
+          diagnostics.push({
+            severity: DiagnosticSeverity.Error,
+            range: {
+              start: { line: token.line, character: token.start },
+              end: { line: token.line, character: token.end },
+            },
+            message: `String variable name must be exactly 1 character long (e.g., A$), but found '${variableName}'`,
+            source: "zx-basic-lsp",
+          });
+        }
+      }
+      // Check if this is an integer variable (ends with %)
+      else if (variableName.endsWith("%")) {
+        const baseName = variableName.slice(0, -1);
+        if (baseName.length !== 1) {
+          diagnostics.push({
+            severity: DiagnosticSeverity.Error,
+            range: {
+              start: { line: token.line, character: token.start },
+              end: { line: token.line, character: token.end },
+            },
+            message: `Integer variable name must be exactly 1 character long (e.g., B%), but found '${variableName}'`,
+            source: "zx-basic-lsp",
+          });
+        }
+      }
+      // Check if this is used in FOR/NEXT context
+      else {
+        // Check if previous token is FOR or NEXT keyword
+        if (tokenIndex > 0) {
+          const prevToken = tokens[tokenIndex - 1];
+          if (
+            prevToken &&
+            (prevToken.value === "FOR" || prevToken.value === "NEXT")
+          ) {
+            if (variableName.length !== 1) {
+              diagnostics.push({
+                severity: DiagnosticSeverity.Error,
+                range: {
+                  start: { line: token.line, character: token.start },
+                  end: { line: token.line, character: token.end },
+                },
+                message: `FOR/NEXT loop variable must be exactly 1 character long (e.g., I), but found '${variableName}'`,
+                source: "zx-basic-lsp",
+              });
+            }
+          }
+        }
+
+        // Check if this is used in DIM context (array variable)
+        if (tokenIndex < tokens.length - 1) {
+          const prevToken = tokens[tokenIndex - 1];
+          const nextToken = tokens[tokenIndex + 1];
+
+          if (
+            prevToken &&
+            prevToken.value === "DIM" &&
+            nextToken &&
+            nextToken.value === "("
+          ) {
+            if (variableName.length !== 1) {
+              diagnostics.push({
+                severity: DiagnosticSeverity.Error,
+                range: {
+                  start: { line: token.line, character: token.start },
+                  end: { line: token.line, character: token.end },
+                },
+                message: `Array variable name must be exactly 1 character long (e.g., A), but found '${variableName}'`,
+                source: "zx-basic-lsp",
+              });
+            }
+          }
+        }
+      }
+    }
+
     // Validate line numbers (1-9999, integer only)
     if (token.type === TokenType.LINE_NUMBER) {
       const lineNum = parseInt(token.value, 10);

@@ -354,6 +354,9 @@ export function formatLine(
       } else {
         formatted += commentText;
       }
+    } else if (token.type === TokenType.NEWLINE) {
+      // Preserve NEWLINE tokens exactly as written (single quotes)
+      formatted += token.value;
     } else {
       formatted += token.value;
     }

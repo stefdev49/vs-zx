@@ -76,6 +76,7 @@ export enum TokenType {
   STRING = "STRING",
   IDENTIFIER = "IDENTIFIER",
   LINE_NUMBER = "LINE_NUMBER",
+  NEWLINE = "NEWLINE",
 
   // Punctuation
   LPAREN = "(",
@@ -171,6 +172,12 @@ export class ZXBasicLexer {
       } else if (this.isOperator(char)) {
         tokens.push(this.lexOperator());
         atLineStart = false;
+      } else if (char === "'") {
+        // Handle single quotes - they could be newlines in PRINT context
+        // For now, we'll tokenize them as NEWLINE and let validation handle context
+        tokens.push(this.lexNewline());
+        atLineStart = false;
+        // Note: lexNewline() handles its own advancement, so we don't call this.advance() here
       } else {
         const startCol = this.column;
         tokens.push({
@@ -588,6 +595,26 @@ export class ZXBasicLexer {
       return TokenType.KEYWORD;
     }
     return TokenType.IDENTIFIER;
+  }
+
+  private lexNewline(): Token {
+    const start = this.position;
+    const startCol = this.column;
+
+    // Count consecutive single quotes
+    let quoteCount = 0;
+    while (this.position < this.text.length && this.currentChar() === "'") {
+      this.advance();
+      quoteCount++;
+    }
+
+    return {
+      type: TokenType.NEWLINE,
+      value: "'".repeat(quoteCount),
+      line: this.line,
+      start: startCol,
+      end: this.column,
+    };
   }
 }
 

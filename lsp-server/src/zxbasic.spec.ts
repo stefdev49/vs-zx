@@ -62,6 +62,66 @@ describe("ZXBasicLexer", () => {
     );
   });
 
+  test("should tokenize multi-character string variables for validation", () => {
+    const tokens = lexer.tokenize("ABC$");
+    expect(tokens).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: TokenType.IDENTIFIER, value: "ABC$" }),
+      ]),
+    );
+  });
+
+  test("should tokenize multi-character integer variables for validation", () => {
+    const tokens = lexer.tokenize("TEST%");
+    expect(tokens).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: TokenType.IDENTIFIER, value: "TEST%" }),
+      ]),
+    );
+  });
+
+  test("should tokenize multi-character FOR variables for validation", () => {
+    const tokens = lexer.tokenize("FOR COUNTER = 1 TO 10");
+    const counterToken = tokens.find((t) => t.value === "COUNTER");
+    expect(counterToken).toBeDefined();
+    expect(counterToken?.type).toBe(TokenType.IDENTIFIER);
+  });
+
+  test("should tokenize multi-character DIM variables for validation", () => {
+    const tokens = lexer.tokenize("DIM ARRAY(10)");
+    const arrayToken = tokens.find((t) => t.value === "ARRAY");
+    expect(arrayToken).toBeDefined();
+    expect(arrayToken?.type).toBe(TokenType.IDENTIFIER);
+  });
+
+  test("should tokenize two-character DIM variable RR for validation", () => {
+    const tokens = lexer.tokenize("DIM RR(5)");
+    const rrToken = tokens.find((t) => t.value === "RR");
+    expect(rrToken).toBeDefined();
+    expect(rrToken?.type).toBe(TokenType.IDENTIFIER);
+  });
+
+  test("should tokenize single quotes as NEWLINE in PRINT statements", () => {
+    const tokens = lexer.tokenize("PRINT 'Hello'");
+    expect(tokens).toContainEqual(
+      expect.objectContaining({ type: TokenType.NEWLINE, value: "'" }),
+    );
+  });
+
+  test("should tokenize multiple consecutive quotes as single NEWLINE token", () => {
+    const tokens = lexer.tokenize("PRINT ''World");
+    expect(tokens).toContainEqual(
+      expect.objectContaining({ type: TokenType.NEWLINE, value: "''" }),
+    );
+  });
+
+  test("should tokenize single quotes outside PRINT context as NEWLINE", () => {
+    const tokens = lexer.tokenize("LET A = 'test'");
+    expect(tokens).toContainEqual(
+      expect.objectContaining({ type: TokenType.NEWLINE, value: "'" }),
+    );
+  });
+
   test("should tokenize operators", () => {
     const tokens = lexer.tokenize("+ - * / ^ = < > <> <= >=");
     expect(tokens.filter((t) => t.type === TokenType.OPERATOR)).toHaveLength(
