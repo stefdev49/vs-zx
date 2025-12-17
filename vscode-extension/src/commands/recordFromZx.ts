@@ -270,11 +270,45 @@ async function recordFromZx() {
         recordingOutputChannel?.appendLine('---');
         recordingOutputChannel?.appendLine('Recording completed');
       } else {
-        recordingOutputChannel?.appendLine('---');
-        recordingOutputChannel?.appendLine(
-          `Recording failed with code ${code}`,
-        );
-        window.showErrorMessage(`Recording failed with exit code ${code}`);
+        // For audio recording tools, non-zero exit codes can be normal when interrupted
+        // Check if we have a WAV file - if so, treat it as success
+        if (tempWavFile && fs.existsSync(tempWavFile)) {
+          const wavStats = fs.statSync(tempWavFile);
+          if (wavStats.size > 0) {
+            recordingOutputChannel?.appendLine('---');
+            recordingOutputChannel?.appendLine(
+              'Recording stopped (interrupted but data captured)',
+            );
+          } else {
+            recordingOutputChannel?.appendLine('---');
+            recordingOutputChannel?.appendLine(
+              `Recording failed with code ${code}`,
+            );
+            window.showErrorMessage(`Recording failed with exit code ${code}`);
+
+            // Clean up and return early
+            if (recordingStatusBar) {
+              recordingStatusBar.hide();
+            }
+            activeRecordingProcess = null;
+            cleanupTempFiles();
+            return;
+          }
+        } else {
+          recordingOutputChannel?.appendLine('---');
+          recordingOutputChannel?.appendLine(
+            `Recording failed with code ${code}`,
+          );
+          window.showErrorMessage(`Recording failed with exit code ${code}`);
+
+          // Clean up and return early
+          if (recordingStatusBar) {
+            recordingStatusBar.hide();
+          }
+          activeRecordingProcess = null;
+          cleanupTempFiles();
+          return;
+        }
       }
 
       // Process the recording
@@ -405,16 +439,61 @@ async function processRecording(tzxwavPath: string, outputDirectory: string) {
       `TZX file created: ${tempTzxFile} (${tzxStats.size} bytes)`,
     );
 
+    // Check if TZX file is suspiciously small (likely no valid tape data found)
+    if (tzxStats.size < 100) {
+      recordingOutputChannel?.appendLine(
+        '⚠️  TZX file is very small - no valid ZX Spectrum tape data detected',
+      );
+      recordingOutputChannel?.appendLine('💡 Tips for successful recording:');
+      recordingOutputChannel?.appendLine(
+        '   1. Make sure you have proper audio connection from ZX Spectrum tape output',
+      );
+      recordingOutputChannel?.appendLine(
+        '   2. Start recording BEFORE starting tape output on ZX Spectrum',
+      );
+      recordingOutputChannel?.appendLine(
+        '   3. Use proper volume levels - tape signals should be clear',
+      );
+      recordingOutputChannel?.appendLine(
+        '   4. Try adjusting tzxwav sensitivity settings if needed',
+      );
+    }
+
     // Parse TZX file to extract program name and convert to BASIC
     await convertTzxToBasic(tempTzxFile, outputDirectory);
   } catch (error) {
     const err = error as Error;
-    window.showErrorMessage(`Failed to process recording: ${err.message}`);
     recordingOutputChannel?.appendLine(`Error: ${err.message}`);
     console.error('Recording processing error:', err);
-  } finally {
-    // Clean up temp files after processing
-    cleanupTempFiles();
+
+    // Keep WAV file for diagnosis when conversion fails
+    if (tempWavFile && fs.existsSync(tempWavFile)) {
+      recordingOutputChannel?.appendLine(
+        `⚠️  WAV file preserved for diagnosis: ${tempWavFile}`,
+      );
+      recordingOutputChannel?.appendLine(
+        '💡 You can manually convert this file using: tzxwav -o output.tzx ' +
+          tempWavFile,
+      );
+      // Only clean up TZX file, keep WAV file
+      if (tempTzxFile && fs.existsSync(tempTzxFile)) {
+        try {
+          fs.unlinkSync(tempTzxFile);
+          recordingOutputChannel?.appendLine(
+            `Cleaned up temporary TZX file: ${tempTzxFile}`,
+          );
+        } catch (cleanupError) {
+          console.warn('Failed to clean up TZX file:', cleanupError);
+        }
+      }
+
+      window.showErrorMessage(
+        `Failed to process recording: ${err.message}. WAV file preserved at ${tempWavFile} for diagnosis.`,
+      );
+    } else {
+      window.showErrorMessage(`Failed to process recording: ${err.message}`);
+      cleanupTempFiles();
+    }
   }
 }
 

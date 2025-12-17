@@ -13,14 +13,13 @@ Legend: `[x]` = Done, `[ ]` = To Do, `[ ] (WIP)` = In Progress.
 - [x] (WIP) **RS232** transfer utility
 - [x] **Save as TZX** - Convert BASIC programs to TZX tape format for use with emulators and tape preservation tools
 - [x] **Play to ZX Spectrum** - Convert and play BASIC programs directly through audio using tzxplay, no file writing needed
-- [ ] **Record from ZX Spectrum** - Convert BASIC programs directly from ZX Spectrum audio using tzxwav and audio recording, no file writing needed
+- [x] **Record from ZX Spectrum** - Convert BASIC programs directly from ZX Spectrum audio using tzxwav and audio recording, no file writing needed
 - [x] **Advanced Refactoring** - Extract variables, extract subroutines, and other code transformations
 - [x] **Code Formatting** - Automatic line numbering, keyword uppercasing, and code cleanup
 - [ ] **Save to mdv** - Convert BASIC programs to MDV format
 - [ ] **Network transfer** - Transfer BASIC programs to ZX Spectrum using ZX Interface 1. (will need a modified https://oqtadrive.org/ version)
 
 ## LSP Feature Roadmap
-
 
 ### Core Navigation
 
@@ -183,3 +182,56 @@ The **ZX Spectrum Playback** output channel shows real-time progress including:
 - Completion or error messages
 
 Press `Ctrl+Shift+U` or click View > Output and select "ZX Spectrum Playback" to view progress.
+
+## Audio Recording Feature
+
+The **Record from ZX Spectrum** feature allows you to capture BASIC programs directly from your ZX Spectrum's audio output and convert them back to editable source code.
+
+### Requirements
+
+Install `tzxtools` which includes both `tzxplay` and `tzxwav`:
+
+```bash
+pip install tzxtools
+```
+
+Additionally, you need audio recording tools based on your platform:
+
+- **Linux**: `arecord` (usually included with ALSA utilities)
+- **macOS**: `rec` (install via `brew install sox`)
+- **Windows**: `ffmpeg` (download from https://ffmpeg.org/)
+
+### Usage
+
+1. Connect your ZX Spectrum's tape output to your computer's audio input
+2. On the Spectrum, type `SAVE "PROGRAM"` and press ENTER to start tape output
+3. In VS Code, open a ZX BASIC file and run: **ZX BASIC: Record from ZX Spectrum** (Ctrl+Shift+P)
+4. The extension will start recording audio and show progress in the status bar
+5. When recording is complete (or you stop it manually), the audio will be converted to TZX format
+6. The TZX file will be parsed and converted back to BASIC source code
+7. A new `.bas` file will be created with the extracted program
+
+### Configuration
+
+- `zxBasic.recordFromZx.tzxwavPath` - Path to tzxwav executable (default: "tzxwav")
+- `zxBasic.recordFromZx.recordingDuration` - Recording duration in seconds (0 for manual stop, default: 0)
+- `zxBasic.recordFromZx.outputDirectory` - Directory to save recorded programs (default: "${workspaceFolder}/recordings")
+
+### Accessing the Feature
+
+The "Record from ZX Spectrum" command is available in multiple locations:
+
+1. **Command Palette**: Press `Ctrl+Shift+P` and search for "Record from ZX Spectrum"
+2. **Editor Context Menu**: Right-click in a ZX BASIC file and select "Record from ZX Spectrum"
+3. **Editor Title Menu**: Click the gear icon in the top-right corner of the editor
+
+### Status Monitoring
+
+The **ZX Spectrum Recording** output channel shows real-time progress including:
+
+- Audio recording status and duration
+- WAV to TZX conversion progress
+- TZX parsing and BASIC extraction status
+- Final file creation information
+
+Press `Ctrl+Shift+U` or click View > Output and select "ZX Spectrum Recording" to view progress.
