@@ -2,7 +2,7 @@
   "name": "zx-basic-vscode-extension",
   "repository": "git+https://github.com/stef/vs-zx.git",
   "displayName": "ZX BASIC Development Environment",
-  "version": "1.0.152",
+  "version": "1.0.158",
   "description": "VS Code extension for ZX Spectrum BASIC development with Interface 1 transfer",
   "license": "MIT",
   "engines": {
@@ -263,68 +263,42 @@
             "default": true,
             "description": "Enable immediate keyword uppercasing as you type (when space/enter is pressed)"
           },
-          "zxBasic.trace.server": {
-            "type": "string",
-            "enum": [
-              "off",
-              "messages",
-              "verbose"
-            ],
-            "default": "off",
-            "description": "Trace the communication between VS Code and the language server"
-          },
-          "zx-basic.serialPort": {
-            "type": "string",
-            "default": "/dev/ttyUSB0",
-            "description": "The serial port for RS232 transfer"
-          },
-          "zx-basic.baudRate": {
-            "type": "number",
-            "default": 9600,
-            "enum": [
-              9600,
-              19200,
-              38400
-            ],
-            "description": "Baud rate for RS232 communication"
-          },
-          "zxBasic.tzxplay.path": {
-            "type": "string",
-            "default": "tzxplay",
-            "description": "Path to tzxplay executable for audio playback"
-          },
-          "zxBasic.tzxplay.mode48k": {
-            "type": "boolean",
-            "default": false,
-            "description": "Enable ZX Spectrum 48K mode for tzxplay"
-          },
-          "zxBasic.tzxplay.sine": {
-            "type": "boolean",
-            "default": false,
-            "description": "Generate soft sine pulses instead of square pulses"
-          },
-          "zxBasic.recordFromZx": {
+          "zxBasic.mdr": {
             "type": "object",
             "default": {
-              "tzxwavPath": "tzxwav",
-              "recordingDuration": 0,
-              "outputDirectory": "${workspaceFolder}/recordings"
+              "errorPolicy": "fix-data",
+              "defaultCartridgeName": "ZXBASIC",
+              "showSectorMapOnError": true,
+              "maxRetries": 3
             },
             "properties": {
-              "zxBasic.recordFromZx.tzxwavPath": {
+              "zxBasic.mdr.errorPolicy": {
                 "type": "string",
-                "default": "tzxwav",
-                "description": "Path to tzxwav executable for audio recording conversion"
+                "enum": [
+                  "strict",
+                  "lenient",
+                  "fix-data"
+                ],
+                "default": "fix-data",
+                "description": "Error handling policy for corrupted MDR sectors: strict (fail on errors), lenient (warn but proceed), fix-data (attempt automatic repair)"
               },
-              "zxBasic.recordFromZx.recordingDuration": {
+              "zxBasic.mdr.defaultCartridgeName": {
+                "type": "string",
+                "default": "ZXBASIC",
+                "maxLength": 10,
+                "description": "Default cartridge name for new MDR files (max 10 characters)"
+              },
+              "zxBasic.mdr.showSectorMapOnError": {
+                "type": "boolean",
+                "default": true,
+                "description": "Show detailed sector error map when loading MDR files with checksum errors"
+              },
+              "zxBasic.mdr.maxRetries": {
                 "type": "number",
-                "default": 0,
-                "description": "Recording duration in seconds (0 for manual stop)"
-              },
-              "zxBasic.recordFromZx.outputDirectory": {
-                "type": "string",
-                "default": "${workspaceFolder}/recordings",
-                "description": "Directory to save recorded BASIC programs"
+                "default": 3,
+                "minimum": 1,
+                "maximum": 10,
+                "description": "Maximum number of retries when reading problematic sectors from physical Microdrive cartridges"
               }
             }
           }

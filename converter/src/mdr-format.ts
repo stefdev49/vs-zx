@@ -2,6 +2,8 @@
 // Based on mdv2img by Volker Bartheld <vbartheld@gmx.de>
 // WinZ80 emulator compatible .mdr format
 
+import { tokenizeLine } from "./tokenizer";
+
 /**
  * MDR File Format Constants
  * Based on Sinclair Microdrive specification and WinZ80 emulator format
@@ -255,8 +257,8 @@ function parseMdrSector(
     checksum: sectorBuffer[29],
   };
 
-  // Parse data (remaining 513 bytes)
-  const data = sectorBuffer.subarray(30, 543);
+  // Parse data (512 bytes) and checksum (1 byte)
+  const data = sectorBuffer.subarray(30, 542); // 512 bytes
   const dataChecksum = sectorBuffer[542];
 
   return {
@@ -269,14 +271,28 @@ function parseMdrSector(
 
 /**
  * Check if sector contains BASIC program
+ * ZX BASIC programs start with line number (2 bytes) and length (2 bytes)
  */
 function isBasicSector(sector: MdrSector): boolean {
-  // BASIC programs typically have specific patterns
-  // Check for line numbers, keywords, etc.
   try {
-    // Simple heuristic: look for line number patterns
-    const text = Buffer.from(sector.data).toString("ascii");
-    return /^\d{1,4} /.test(text.trim());
+    // Check minimum length for a valid BASIC line
+    if (sector.data.length < 4) return false;
+
+    // Read line number (2 bytes, little-endian)
+    const lineNumber = sector.data[0] | (sector.data[1] << 8);
+
+    // Read line length (2 bytes, little-endian)
+    const lineLength = sector.data[2] | (sector.data[3] << 8);
+
+    // Validate line number and length
+    // Line numbers are typically 1-9999, line length should be reasonable
+    return (
+      lineNumber > 0 &&
+      lineNumber <= 9999 &&
+      lineLength > 0 &&
+      lineLength <= 512 &&
+      lineLength <= sector.data.length - 4
+    );
   } catch (error) {
     return false;
   }
@@ -286,8 +302,6 @@ function isBasicSector(sector: MdrSector): boolean {
  * Extract BASIC source from sector data
  */
 function extractBasicFromSector(sector: MdrSector): string {
-  // Convert data to ASCII and extract BASIC source
-  // This is a simplified extraction - real implementation would use proper tokenizer
   let source = "";
   let position = 0;
 
@@ -302,21 +316,230 @@ function extractBasicFromSector(sector: MdrSector): string {
 
     if (lineLength === 0) break;
 
-    // Extract line content
-    const lineContent = sector.data.subarray(position, position + lineLength);
+    // Extract line content (excluding terminator)
+    const lineContent = sector.data.subarray(
+      position,
+      position + lineLength - 1,
+    );
     position += lineLength;
 
-    // Convert to text (simplified - real implementation would use proper tokenizer)
-    const lineText = Buffer.from(lineContent)
-      .toString("ascii")
-      .replace(/\r/g, "")
-      .replace(/\n/g, "")
-      .replace(/\0/g, "");
+    // Detokenize the line content
+    const lineText = detokenizeLine(lineContent);
 
     source += `${lineNumber} ${lineText}\n`;
   }
 
   return source;
+}
+
+/**
+ * Simple token to keyword mapping for detokenization
+ */
+function detokenizeLine(tokens: Uint8Array): string {
+  let result = "";
+  let i = 0;
+  let lastWasToken = false;
+
+  while (i < tokens.length) {
+    const token = tokens[i];
+
+    // Handle number encoding (0x0E marker followed by 2 bytes for small integers)
+    if (token === 0x0e && i + 2 < tokens.length) {
+      const numLow = tokens[i + 1];
+      const numHigh = tokens[i + 2];
+      const num = numLow | (numHigh << 8);
+      
+      if (lastWasToken && result.length > 0) {
+        result += " ";
+      }
+      result += num.toString();
+      i += 3;
+      lastWasToken = false;
+      continue;
+    }
+
+    // Try to interpret as keyword token first (before treating as ASCII)
+    // This is necessary because the tokenizer uses 0x00-0x5B for tokens,
+    // which overlaps with ASCII range
+    const keyword = getKeywordFromToken(token);
+
+    if (keyword !== null) {
+      // This is a ZX BASIC keyword token
+      if (lastWasToken && result.length > 0) {
+        // Add space between consecutive tokens
+        result += " ";
+      }
+      result += keyword;
+      i++;
+      lastWasToken = true;
+    } else {
+      // Not a keyword token - treat as ASCII
+      // If the last thing was a token and this is not a space, add a space
+      if (lastWasToken && token !== 0x20 && result.length > 0) {
+        result += " ";
+      }
+      result += String.fromCharCode(token);
+      i++;
+      lastWasToken = false;
+    }
+  }
+
+  return result;
+}
+
+function getKeywordFromToken(token: number): string | null {
+  // This function needs to match the tokenizer's encoding in tokenizer.ts
+  // The tokenizer uses a non-standard encoding where tokens are in ranges 0x00-0x5B
+  // This is NOT the real ZX Spectrum format (which uses 0xA3+), but we need to
+  // detokenize what the tokenizer creates for round-trip consistency
+  
+  // Number marker (0x0E) - handled separately in detokenizeLine  
+  if (token === 0x0e) {
+    return null;
+  }
+
+  // ASCII characters that are NEVER tokens (punctuation, separators)
+  // These are always output as ASCII by the tokenizer
+  const neverTokens = [
+    0x20, // space
+    0x21, // !
+    0x22, // "
+    0x27, // '
+    0x28, // (
+    0x29, // )
+    0x2c, // ,
+    0x2e, // .
+    0x3a, // :
+    0x3b, // ;
+    0x3c, // <
+    0x3d, // =
+    0x3e, // >
+    0x3f, // ?
+  ];
+  
+  if (neverTokens.includes(token)) {
+    return null;
+  }
+
+  // Note: This mapping must match TOKEN_MAP in tokenizer.ts
+  // Function/expression tokens (0x00-0x1F)
+  const functionTokens: Record<number, string> = {
+    0x00: "RND",
+    0x01: "INKEY$",
+    0x02: "PI",
+    0x03: "FN",
+    0x04: "POINT",
+    0x05: "SCREEN$",
+    0x06: "ATTR",
+    0x07: "AT",
+    0x08: "TAB",
+    0x09: "VAL$",
+    0x0a: "CODE",
+    0x0b: "VAL",
+    0x0c: "LEN",
+    0x0d: "SIN",
+    // 0x0e is number marker
+    0x0f: "TAN",
+    0x10: "ASN",
+    0x11: "ACS",
+    0x12: "ATN",
+    0x13: "LN",
+    0x14: "EXP",
+    0x15: "INT",
+    0x16: "SQR",
+    0x17: "SGN",
+    0x18: "ABS",
+    0x19: "PEEK",
+    0x1a: "IN",
+    0x1b: "USR",
+    0x1c: "STR$",
+    0x1d: "CHR$",
+    0x1e: "NOT",
+    0x1f: "BIN",
+  };
+
+  if (functionTokens[token]) {
+    return functionTokens[token];
+  }
+
+  // Operator tokens that don't overlap with essential ASCII
+  const operatorTokens: Record<number, string> = {
+    0x20: "**",  // Note: conflicts with space, but ** is tokenized specially
+    0x21: "OR",  // Note: conflicts with !, but OR is tokenized as keyword
+    0x22: "AND", // Note: conflicts with ", but AND is tokenized as keyword
+    0x23: "<=",
+    0x24: ">=",
+    0x25: "<>",
+    0x26: "LINE",
+    0x27: "THEN",  // Note: conflicts with '
+    0x28: "TO",    // Note: conflicts with (
+    0x29: "STEP",  // Note: conflicts with )
+    0x2a: "DEF FN",
+    0x2b: "CAT",
+    // Skip 0x2C (comma)
+    0x2d: "MOVE",
+    0x2e: "ERASE", // Note: conflicts with .
+    0x2f: "OPEN #",
+    0x30: "CLOSE #",
+    0x31: "MERGE",
+    0x32: "VERIFY",
+    0x33: "BEEP",
+    0x34: "CIRCLE",
+    0x35: "INK",
+    0x36: "PAPER",
+    0x37: "FLASH",
+    0x38: "BRIGHT",
+    0x39: "INVERSE",
+    // Skip 0x3A (colon)
+    0x3b: "OUT",
+    0x3c: "LPRINT",
+    0x3d: "LLIST",
+    0x3e: "STOP",
+    0x3f: "READ",
+  };
+
+  if (operatorTokens[token]) {
+    return operatorTokens[token];
+  }
+
+  // Command tokens (0x40-0x5B)
+  const commandTokens: Record<number, string> = {
+    0x40: "DATA",
+    0x41: "RESTORE",
+    0x42: "NEW",
+    0x43: "BORDER",
+    0x44: "CONTINUE",
+    0x45: "DIM",
+    0x46: "REM",
+    0x47: "FOR",
+    0x48: "GO TO",
+    0x49: "GO SUB",
+    0x4a: "INPUT",
+    0x4b: "LOAD",
+    0x4c: "LIST",
+    0x4d: "LET",
+    0x4e: "PAUSE",
+    0x4f: "NEXT",
+    0x50: "POKE",
+    0x51: "PRINT",
+    0x52: "PLOT",
+    0x53: "RUN",
+    0x54: "SAVE",
+    0x55: "RANDOMIZE",
+    0x56: "IF",
+    0x57: "CLS",
+    0x58: "DRAW",
+    0x59: "CLEAR",
+    0x5a: "RETURN",
+    0x5b: "COPY",
+  };
+
+  if (commandTokens[token]) {
+    return commandTokens[token];
+  }
+
+  // Anything else (ASCII characters, variable names, etc.) is not a token
+  return null;
 }
 
 /**
@@ -445,25 +668,41 @@ function writeMdrSector(
  * Simple BASIC tokenizer (simplified version)
  * Real implementation would use full ZX BASIC tokenizer
  */
-function tokenizeBasic(source: string): Uint8Array {
-  // This is a simplified tokenizer - real implementation would:
-  // 1. Parse line numbers
-  // 2. Convert keywords to tokens
-  // 3. Handle variables and expressions
-  // 4. Generate proper tokenized format
-
-  // For now, just convert to ASCII bytes
+export function tokenizeBasic(source: string): Uint8Array {
   const lines = source.split("\n");
   let result = new Uint8Array(512);
   let position = 0;
 
   for (const line of lines) {
-    if (!line.trim() || position >= 512) continue;
+    const trimmedLine = line.trim();
+    if (!trimmedLine || position >= 512) continue;
 
-    // Simple line format: just store as ASCII
-    const lineBytes = Buffer.from(line + "\r", "ascii");
-    lineBytes.copy(result, position);
-    position += lineBytes.length;
+    // Parse line number (first token should be line number)
+    const lineNumberMatch = trimmedLine.match(/^(\d+)\s+/);
+    if (!lineNumberMatch) continue;
+
+    const lineNumber = parseInt(lineNumberMatch[1]);
+    const lineContent = trimmedLine.substring(lineNumberMatch[0].length);
+
+    // Tokenize the line content
+    const tokens = tokenizeLine(lineContent);
+    const lineLength = tokens.length + 1; // +1 for 0x0D terminator
+
+    // Write line number (2 bytes, little-endian)
+    result[position++] = lineNumber & 0xff;
+    result[position++] = (lineNumber >> 8) & 0xff;
+
+    // Write line length (2 bytes, little-endian)
+    result[position++] = lineLength & 0xff;
+    result[position++] = (lineLength >> 8) & 0xff;
+
+    // Write tokens
+    for (const token of tokens) {
+      result[position++] = token;
+    }
+
+    // Write terminator
+    result[position++] = 0x0d;
   }
 
   return result.subarray(0, position);

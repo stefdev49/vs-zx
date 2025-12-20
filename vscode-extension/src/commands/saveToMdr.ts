@@ -25,11 +25,18 @@ export function register() {
         return;
       }
 
+      // Get configuration for default cartridge name
+      const config = workspace.getConfiguration('zxBasic.mdr');
+      const defaultCartridgeName = config.get<string>(
+        'defaultCartridgeName',
+        'ZXBASIC',
+      );
+
       // Get cartridge name
       const cartridgeName = await window.showInputBox({
         title: 'Microdrive Cartridge Name',
         prompt: 'Enter cartridge name (max 10 characters)',
-        value: 'ZXBASIC',
+        value: defaultCartridgeName,
         validateInput: (value) => {
           if (value.length > 10) {
             return 'Cartridge name must be 10 characters or less';

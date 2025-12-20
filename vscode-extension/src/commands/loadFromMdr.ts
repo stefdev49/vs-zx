@@ -68,6 +68,11 @@ export function register() {
             }
             mdrOutputChannel.clear();
 
+            // Configuration available for future enhancement
+            // const config = workspace.getConfiguration('zxBasic.mdr');
+            // const errorPolicy = config.get<string>('errorPolicy', 'fix-data');
+            // const showSectorMap = config.get<boolean>('showSectorMapOnError', true);
+
             // Use helper function for safe logging
             const log = (message: string) => {
               if (mdrOutputChannel) {

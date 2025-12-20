@@ -36,3 +36,5 @@ coverage/
 
 extras/
 samples/*.tzx
+samples/ZXBASIC.mdr
+samples/5 REM hangmanSIN.bas
