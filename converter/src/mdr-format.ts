@@ -445,7 +445,10 @@ function detokenizeLine(tokens: Uint8Array): string {
       }
       result += keyword;
       i++;
-      lastWasKeyword = true;
+      
+      // Operators like <=, >=, <> don't need space after them
+      const isOperator = ["<=", ">=", "<>"].includes(keyword);
+      lastWasKeyword = !isOperator;
       lastWasNumber = false;
       
       // Check if we just output REM - everything after is literal

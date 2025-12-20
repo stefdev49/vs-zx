@@ -217,8 +217,8 @@ export function tokenizeLine(line: string): number[] {
       continue;
     }
 
-    // Operators and punctuation
-    if ('+-*/<>=(),:;.'.includes(char)) {
+    // Operators and punctuation (including ' which is PRINT newline separator)
+    if ("+-*/<>=(),:;.'".includes(char)) {
       // Check for multi-character operators
       if (char === '<' && i + 1 < line.length) {
         if (line[i + 1] === '=') {
