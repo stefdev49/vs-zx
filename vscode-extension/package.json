@@ -59,6 +59,18 @@
         "icon": "$(debug-stop)"
       },
       {
+        "command": "zx-basic.loadFromMdr",
+        "title": "Load from MDR",
+        "category": "ZX BASIC",
+        "icon": "$(database)"
+      },
+      {
+        "command": "zx-basic.saveToMdr",
+        "title": "Save to MDR",
+        "category": "ZX BASIC",
+        "icon": "$(save)"
+      },
+      {
         "command": "zx-basic.extractVariable",
         "title": "Extract Variable",
         "category": "ZX BASIC Refactoring"
@@ -104,6 +116,14 @@
           "command": "zx-basic.stopTzxPlayback"
         },
         {
+          "command": "zx-basic.loadFromMdr",
+          "when": "editorLangId == zx-basic"
+        },
+        {
+          "command": "zx-basic.saveToMdr",
+          "when": "editorLangId == zx-basic"
+        },
+        {
           "command": "zx-basic.extractVariable",
           "when": "editorLangId == zx-basic"
         },
@@ -141,6 +161,16 @@
           "group": "1_modification"
         },
         {
+          "command": "zx-basic.loadFromMdr",
+          "when": "editorLangId == zx-basic",
+          "group": "1_modification"
+        },
+        {
+          "command": "zx-basic.saveToMdr",
+          "when": "editorLangId == zx-basic",
+          "group": "1_modification"
+        },
+        {
           "command": "zx-basic.extractVariable",
           "when": "editorLangId == zx-basic",
           "group": "2_refactoring",
@@ -161,6 +191,16 @@
         },
         {
           "command": "zx-basic.recordFromZx",
+          "when": "editorLangId == zx-basic",
+          "group": "1_modification"
+        },
+        {
+          "command": "zx-basic.loadFromMdr",
+          "when": "editorLangId == zx-basic",
+          "group": "1_modification"
+        },
+        {
+          "command": "zx-basic.saveToMdr",
           "when": "editorLangId == zx-basic",
           "group": "1_modification"
         },
@@ -299,7 +339,9 @@
     "onCommand:zx-basic.playToZx",
     "onCommand:zx-basic.stopTzxPlayback",
     "onCommand:zx-basic.recordFromZx",
-    "onCommand:zx-basic.stopZxRecording"
+    "onCommand:zx-basic.stopZxRecording",
+    "onCommand:zx-basic.loadFromMdr",
+    "onCommand:zx-basic.saveToMdr"
   ],
   "main": "./out/extension.js",
   "scripts": {

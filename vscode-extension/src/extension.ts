@@ -25,6 +25,8 @@ import * as transferCmd from './commands/transfer';
 import * as saveAsTzxCmd from './commands/saveAsTzx';
 import * as playToZxCmd from './commands/playToZx';
 import * as recordFromZxCmd from './commands/recordFromZx';
+import * as loadFromMdrCmd from './commands/loadFromMdr';
+import * as saveToMdrCmd from './commands/saveToMdr';
 import * as extractVariableCmd from './commands/refactor/extractVariable';
 import * as renumberLinesCmd from './commands/refactor/renumberLines';
 import * as extractSubroutineCmd from './commands/refactor/extractSubroutine';
@@ -251,6 +253,10 @@ export function activate(context: ExtensionContext) {
 
   // Register command for record from ZX
   recordFromZxCmd.register(context);
+
+  // Register MDR commands
+  context.subscriptions.push(loadFromMdrCmd.register());
+  context.subscriptions.push(saveToMdrCmd.register());
 
   // Register refactoring commands
   context.subscriptions.push(extractVariableCmd.register());

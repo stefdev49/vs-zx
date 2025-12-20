@@ -1,15 +1,15 @@
 import {
   Bas2TapOptions,
   ConvertArtifacts,
-  convertBasicSource
-} from './core/converter';
+  convertBasicSource,
+} from "./core/converter";
 export {
   Bas2TapOptions,
   ConvertArtifacts,
-  convertBasicSource
-} from './core/converter';
+  convertBasicSource,
+} from "./core/converter";
 
-export { convertBasicWithObjects, ObjectInfo } from './core/converter';
+export { convertBasicWithObjects, ObjectInfo } from "./core/converter";
 
 export {
   createHeaderBlock,
@@ -17,8 +17,8 @@ export {
   createTapFile,
   parseTapFile,
   getTapMetadata,
-  verifyTapChecksums
-} from './tap-format';
+  verifyTapChecksums,
+} from "./tap-format";
 
 export {
   convertTapToTzx,
@@ -27,10 +27,31 @@ export {
   getTzxMetadata,
   createTzxWithDescription,
   TzxBlock,
-  TzxMetadata
-} from './tzx-format';
+  TzxMetadata,
+} from "./tzx-format";
 
-export const VERSION = '1.0.0';
+// MDR (Microdrive) Format Support
+export {
+  MDR_SECTOR_SIZE,
+  MDR_TOTAL_SECTORS,
+  MDR_FILE_SIZE,
+  MdrSector,
+  MdrFile,
+  MdrError,
+  MdrErrorPolicy,
+  DEFAULT_ERROR_POLICY,
+  calculateMdrChecksum,
+  validateMdrSector,
+  parseMdrFile,
+  createMdrFile,
+  repairMdrSector,
+  createEmptyMdr,
+  getMdrSector,
+  isValidMdrFile,
+  getMdrInfo,
+} from "./mdr-format";
+
+export const VERSION = "1.0.0";
 
 export interface ProgramMetadata {
   name: string;
@@ -38,29 +59,29 @@ export interface ProgramMetadata {
   variablesArea?: number;
 }
 
-export type FileFormat = 'raw' | 'tap';
+export type FileFormat = "raw" | "tap";
 
 export function convertBasic(
   basicText: string,
-  options: Bas2TapOptions = {}
+  options: Bas2TapOptions = {},
 ): ConvertArtifacts {
   return convertBasicSource(basicText, options);
 }
 
 export function convertToTap(
   basicText: string,
-  metadata: ProgramMetadata
+  metadata: ProgramMetadata,
 ): Buffer {
   const { tap } = convertBasic(basicText, {
     programName: metadata.name,
-    autostart: metadata.autostart
+    autostart: metadata.autostart,
   });
   return tap;
 }
 
 export function convertToRaw(
   basicText: string,
-  options: Bas2TapOptions = {}
+  options: Bas2TapOptions = {},
 ): Buffer {
   const { raw } = convertBasic(basicText, options);
   return raw;
@@ -68,33 +89,33 @@ export function convertToRaw(
 
 export function convertToBinary(
   basicText: string,
-  options?: Bas2TapOptions
+  options?: Bas2TapOptions,
 ): Buffer {
   return convertToRaw(basicText, options);
 }
 
 export function convertBasicToTap(
   basicCode: string,
-  programName = 'Program',
-  autostart?: number
+  programName = "Program",
+  autostart?: number,
 ): Buffer {
   return convertToTap(basicCode, { name: programName, autostart });
 }
 
 export function convertBasicToTzx(
   basicCode: string,
-  programName = 'Program',
+  programName = "Program",
   autostart?: number,
-  description?: string
+  description?: string,
 ): Buffer {
   const tapBuffer = convertToTap(basicCode, { name: programName, autostart });
-  
+
   if (description) {
-    const { createTzxWithDescription } = require('./tzx-format');
+    const { createTzxWithDescription } = require("./tzx-format");
     return createTzxWithDescription(tapBuffer, description);
   }
-  
-  const { convertTapToTzx } = require('./tzx-format');
+
+  const { convertTapToTzx } = require("./tzx-format");
   return convertTapToTzx(tapBuffer);
 }
 
@@ -106,6 +127,6 @@ export function initialize(): {
   return {
     initialized: true,
     version: VERSION,
-    using: 'TypeScript bas2tap core'
+    using: "TypeScript bas2tap core",
   };
 }
