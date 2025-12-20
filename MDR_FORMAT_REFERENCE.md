@@ -399,71 +399,73 @@ function calculateRecordChecksum(sector: MdrSector): number {
 
 ### Overview
 
-**Important**: This implementation uses a **non-standard tokenization scheme** (not actual ZX Spectrum format which uses 0xA3-0xFF for tokens). The scheme is optimized for internal consistency and round-trip operations.
+**Important**: This implementation uses the **standard ZX Spectrum tokenization scheme** with tokens in the 0xA3-0xFF range, matching the real ZX Spectrum ROM. This ensures compatibility with bas2tap and other authentic tools.
 
 ### Token Map Reference
 
-#### Function/Expression Tokens (0x00-0x1F)
+#### 128K Tokens (0xA3-0xA4)
 
 ```
-0x00=RND      0x08=TAB      0x10=ASN      0x18=ABS
-0x01=INKEY$   0x09=VAL$     0x11=ACS      0x19=PEEK
-0x02=PI       0x0A=CODE     0x12=ATN      0x1A=IN
-0x03=FN       0x0B=VAL      0x13=LN       0x1B=USR
-0x04=POINT    0x0C=LEN      0x14=EXP      0x1C=STR$
-0x05=SCREEN$  0x0D=SIN      0x15=INT      0x1D=CHR$
-0x06=ATTR     0x0E=[NUM]    0x16=SQR      0x1E=NOT
-0x07=AT       0x0F=TAN      0x17=SGN      0x1F=BIN
+0xA3=SPECTRUM   0xA4=PLAY
 ```
 
-#### Operator Tokens (0x20-0x3F)
+#### Function Tokens (0xA5-0xC4)
 
 ```
-0x20=**       0x28=TO       0x30=CLOSE#   0x38=BRIGHT
-0x21=OR       0x29=STEP     0x31=MERGE    0x39=INVERSE
-0x22=AND      0x2A=DEF FN   0x32=VERIFY   0x3A=OVER
-0x23=<=       0x2B=CAT      0x33=BEEP     0x3B=OUT
-0x24=>=       0x2C=FORMAT   0x34=CIRCLE   0x3C=LPRINT
-0x25=<>       0x2D=MOVE     0x35=INK      0x3D=LLIST
-0x26=LINE     0x2E=ERASE    0x36=PAPER    0x3E=STOP
-0x27=THEN     0x2F=OPEN#    0x37=FLASH    0x3F=READ
+0xA5=RND       0xAD=TAB       0xB5=ASN       0xBD=ABS
+0xA6=INKEY$    0xAE=VAL$      0xB6=ACS       0xBE=PEEK
+0xA7=PI        0xAF=CODE      0xB7=ATN       0xBF=IN
+0xA8=FN        0xB0=VAL       0xB8=LN        0xC0=USR
+0xA9=POINT     0xB1=LEN       0xB9=EXP       0xC1=STR$
+0xAA=SCREEN$   0xB2=SIN       0xBA=INT       0xC2=CHR$
+0xAB=ATTR      0xB3=COS       0xBB=SQR       0xC3=NOT
+0xAC=AT        0xB4=TAN       0xBC=SGN       0xC4=BIN
 ```
 
-#### Command Tokens (0x40-0x5B)
+#### Operator Tokens (0xC5-0xCD)
 
 ```
-0x40=DATA     0x48=GO TO    0x50=POKE     0x58=DRAW
-0x41=RESTORE  0x49=GO SUB   0x51=PRINT    0x59=CLEAR
-0x42=NEW      0x4A=INPUT    0x52=PLOT     0x5A=RETURN
-0x43=BORDER   0x4B=LOAD     0x53=RUN      0x5B=COPY
-0x44=CONTINUE 0x4C=LIST     0x54=SAVE
-0x45=DIM      0x4D=LET      0x55=RANDOMIZE
-0x46=REM      0x4E=PAUSE    0x56=IF
-0x47=FOR      0x4F=NEXT     0x57=CLS
+0xC5=OR        0xC9=<>        0xCC=TO
+0xC6=AND       0xCA=LINE      0xCD=STEP
+0xC7=<=        0xCB=THEN
+0xC8=>=
+```
+
+#### Command Tokens (0xCE-0xFF)
+
+```
+0xCE=DEF FN    0xD6=VERIFY    0xDE=OVER      0xE6=NEW       0xEE=INPUT     0xF6=PLOT
+0xCF=CAT       0xD7=BEEP      0xDF=OUT       0xE7=BORDER    0xEF=LOAD      0xF7=RUN
+0xD0=FORMAT    0xD8=CIRCLE    0xE0=LPRINT    0xE8=CONTINUE  0xF0=LIST      0xF8=SAVE
+0xD1=MOVE      0xD9=INK       0xE1=LLIST     0xE9=DIM       0xF1=LET       0xF9=RANDOMIZE
+0xD2=ERASE     0xDA=PAPER     0xE2=STOP      0xEA=REM       0xF2=PAUSE     0xFA=IF
+0xD3=OPEN #    0xDB=FLASH     0xE3=READ      0xEB=FOR       0xF3=NEXT      0xFB=CLS
+0xD4=CLOSE #   0xDC=BRIGHT    0xE4=DATA      0xEC=GO TO     0xF4=POKE      0xFC=DRAW
+0xD5=MERGE     0xDD=INVERSE   0xE5=RESTORE   0xED=GO SUB    0xF5=PRINT     0xFD=CLEAR
+                                                                           0xFE=RETURN
+                                                                           0xFF=COPY
 ```
 
 ### Number Encoding
 
-**Format**: `0x0E <low_byte> <high_byte>`  
-**Range**: 0-65535 (16-bit unsigned integer)  
-**Byte order**: Little-endian
+**Format**: `<ASCII digits> 0x0E <5-byte floating point>`  
+**Byte order**: Little-endian for small integers
 
-**Example**: Number 240 encodes as `0x0E 0xF0 0x00`
+Numbers are stored as ASCII digits followed by a 0x0E marker and 5-byte floating point representation:
+- For small integers (0-65535): `0x0E 0x00 <sign> <low_byte> <high_byte> 0x00`
+- Sign byte: 0x00 for positive, 0xFF for negative
 
-### ASCII vs Token Overlap
+**Example**: Number 100 encodes as `31 30 30 0E 00 00 64 00 00` (ASCII "100" + 5-byte representation)
 
-**Critical Issue**: Token values overlap with ASCII (e.g., 0x35 = both INK and '5')
+### Token Ranges (No Overlap with ASCII)
 
-**Resolution Rules**:
-1. Numbers always use 0x0E marker (never standalone digits)
-2. Punctuation `:,.()'";!?<>=` always treated as ASCII, never tokens
-3. When ambiguous, keyword interpretation takes precedence
+With real ZX Spectrum tokens (0xA3-0xFF), there is **NO overlap** with printable ASCII (0x20-0x7F):
 
-**Never-Token List** (always ASCII):
-```typescript
-[0x20, 0x21, 0x22, 0x27, 0x28, 0x29, 0x2C, 0x2E, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F]
-// space  !     "     '     (     )     ,     .     :     ;     <     =     >     ?
-```
+- **0x00-0x1F**: Control characters (rarely used)
+- **0x20-0x7F**: Printable ASCII characters (variables, strings, punctuation)
+- **0x80-0x8F**: Block graphics
+- **0x90-0xA2**: User-defined graphics (UDGs)
+- **0xA3-0xFF**: BASIC keyword tokens
 
 ### BASIC Line Structure in Data Block
 
@@ -481,51 +483,75 @@ For each line:
 function detokenizeLine(tokens: Uint8Array): string {
   let result = "";
   let i = 0;
-  let lastWasToken = false;
+  let lastWasNumber = false;
 
   while (i < tokens.length) {
-    const token = tokens[i];
+    const byte = tokens[i];
 
-    // Handle number marker
-    if (token === 0x0E && i + 2 < tokens.length) {
-      const num = tokens[i + 1] | (tokens[i + 2] << 8);
-      if (lastWasToken && result.length > 0) result += " ";
-      result += num.toString();
-      i += 3;
-      lastWasToken = false;
+    // Handle 5-byte number encoding (0x0E + 5 bytes)
+    if (byte === 0x0E && i + 5 < tokens.length) {
+      i += 6; // Skip 0x0E and 5-byte representation
+      lastWasNumber = true;
       continue;
     }
 
-    // Try keyword interpretation
-    const keyword = getKeywordFromToken(token);
+    // Try keyword interpretation (tokens are >= 0xA3)
+    const keyword = getKeywordFromToken(byte);
     if (keyword !== null) {
-      if (lastWasToken && result.length > 0) result += " ";
+      // Add space before TO/STEP if last was a number
+      if (lastWasNumber && (keyword === "TO" || keyword === "STEP")) {
+        result += " ";
+      }
       result += keyword;
       i++;
-      lastWasToken = true;
+      lastWasNumber = false;
     } else {
-      // Treat as ASCII
-      if (lastWasToken && token !== 0x20 && result.length > 0) result += " ";
-      result += String.fromCharCode(token);
+      // Treat as ASCII character
+      result += String.fromCharCode(byte);
       i++;
-      lastWasToken = false;
+      lastWasNumber = false;
     }
   }
 
   return result;
 }
 
-function getKeywordFromToken(token: number): string | null {
-  // Check never-token list first
-  const neverTokens = [0x20, 0x21, 0x22, 0x27, 0x28, 0x29, 0x2C, 0x2E, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F];
-  if (token === 0x0E || neverTokens.includes(token)) return null;
+function getKeywordFromToken(byte: number): string | null {
+  // ASCII range (0x00-0x7F) - not tokens
+  if (byte <= 0x7F) return null;
+  
+  // Block graphics and UDGs (0x80-0xA2) - not keyword tokens
+  if (byte >= 0x80 && byte <= 0xA2) return null;
 
-  // Map token to keyword (use token maps from above)
-  const tokenMap: Record<number, string> = {
-    // ... full token map here ...
+  // Real ZX Spectrum token map (0xA3-0xFF)
+  const tokenToKeyword: Record<number, string> = {
+    0xA3: "SPECTRUM", 0xA4: "PLAY",
+    0xA5: "RND", 0xA6: "INKEY$", 0xA7: "PI", 0xA8: "FN",
+    0xA9: "POINT", 0xAA: "SCREEN$", 0xAB: "ATTR", 0xAC: "AT",
+    0xAD: "TAB", 0xAE: "VAL$", 0xAF: "CODE", 0xB0: "VAL",
+    0xB1: "LEN", 0xB2: "SIN", 0xB3: "COS", 0xB4: "TAN",
+    0xB5: "ASN", 0xB6: "ACS", 0xB7: "ATN", 0xB8: "LN",
+    0xB9: "EXP", 0xBA: "INT", 0xBB: "SQR", 0xBC: "SGN",
+    0xBD: "ABS", 0xBE: "PEEK", 0xBF: "IN", 0xC0: "USR",
+    0xC1: "STR$", 0xC2: "CHR$", 0xC3: "NOT", 0xC4: "BIN",
+    0xC5: "OR", 0xC6: "AND", 0xC7: "<=", 0xC8: ">=",
+    0xC9: "<>", 0xCA: "LINE", 0xCB: "THEN", 0xCC: "TO",
+    0xCD: "STEP", 0xCE: "DEF FN", 0xCF: "CAT", 0xD0: "FORMAT",
+    0xD1: "MOVE", 0xD2: "ERASE", 0xD3: "OPEN #", 0xD4: "CLOSE #",
+    0xD5: "MERGE", 0xD6: "VERIFY", 0xD7: "BEEP", 0xD8: "CIRCLE",
+    0xD9: "INK", 0xDA: "PAPER", 0xDB: "FLASH", 0xDC: "BRIGHT",
+    0xDD: "INVERSE", 0xDE: "OVER", 0xDF: "OUT", 0xE0: "LPRINT",
+    0xE1: "LLIST", 0xE2: "STOP", 0xE3: "READ", 0xE4: "DATA",
+    0xE5: "RESTORE", 0xE6: "NEW", 0xE7: "BORDER", 0xE8: "CONTINUE",
+    0xE9: "DIM", 0xEA: "REM", 0xEB: "FOR", 0xEC: "GO TO",
+    0xED: "GO SUB", 0xEE: "INPUT", 0xEF: "LOAD", 0xF0: "LIST",
+    0xF1: "LET", 0xF2: "PAUSE", 0xF3: "NEXT", 0xF4: "POKE",
+    0xF5: "PRINT", 0xF6: "PLOT", 0xF7: "RUN", 0xF8: "SAVE",
+    0xF9: "RANDOMIZE", 0xFA: "IF", 0xFB: "CLS", 0xFC: "DRAW",
+    0xFD: "CLEAR", 0xFE: "RETURN", 0xFF: "COPY",
   };
   
-  return tokenMap[token] || null;
+  return tokenToKeyword[byte] || null;
 }
 ```
 
@@ -771,20 +797,25 @@ Sectors:      254 (numbered 254→1)
 Checksums:    3 levels (header, record, data)
 Algorithm:    sum(bytes) % 255
 
-Token Ranges:
-  0x00-0x1F   Functions/expressions
-  0x20-0x3F   Operators
-  0x40-0x5B   Commands
-  0x0E        Number marker (+ 2 bytes)
+Byte Ranges:
+  0x00-0x1F   Control characters
+  0x20-0x7F   Printable ASCII (variables, strings, punctuation)
+  0x80-0x8F   Block graphics
+  0x90-0xA2   User-defined graphics (UDGs)
+  0xA3-0xA4   128K tokens (SPECTRUM, PLAY)
+  0xA5-0xC4   Function tokens (RND, SIN, CHR$, etc.)
+  0xC5-0xCD   Operator tokens (OR, AND, TO, STEP, etc.)
+  0xCE-0xFF   Command tokens (REM, LET, PRINT, FOR, etc.)
 
-Never-Tokens: : , . ( ) ' " ; ! ? < = >
+Number encoding: <ASCII digits> 0x0E <5-byte float>
 
-BASIC Structure:
-  Line: <num:2> <len:2> <tokens> <0x0D>
+BASIC Line Structure:
+  <linenum:2> <length:2> <tokens...> <0x0D>
+  (line number is big-endian, length is little-endian)
 ```
 
 ---
 
-**Document Version**: 1.0  
+**Document Version**: 1.1  
 **Last Updated**: 2025-12-20  
 **Maintained By**: ZX BASIC VS Code Extension Team

@@ -51,12 +51,12 @@ describe('Pangolin parity fixtures', () => {
   });
 
   test('raw output matches pangolin.raw.hex', () => {
-    const { raw } = convertBasic(pangolinBas);
+    const { raw } = convertBasic(pangolinBas, { programName: 'pangolin' });
     expect(raw.equals(pangolinRaw)).toBe(true);
   });
 
   test('tap output matches pangolin.tap', () => {
-    const { tap } = convertBasic(pangolinBas);
+    const { tap } = convertBasic(pangolinBas, { programName: 'pangolin' });
     expect(tap.equals(pangolinTap)).toBe(true);
   });
 });

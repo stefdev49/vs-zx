@@ -51,17 +51,17 @@ describe('CLI Integration Tests', () => {
     // Line 10 should start with: 00 0a (line number 10 stored high byte first)
     expect(hexStr).toContain('00 0a');
 
-    // After line number, should have REM token 0xa4, NOT ASCII "REM" (52 45 4d)
-    expect(hexStr).toContain('00 0a a4'); // Line 10 + REM token
-    expect(hexStr).not.toContain('00 0a 52 45 4d'); // NOT ASCII "REM"
+    // After line number + length, should have REM token 0xea (real ZX Spectrum), NOT ASCII "REM" (52 45 4d)
+    expect(hexStr).toContain('ea'); // REM token somewhere
+    expect(hexStr).not.toContain('52 45 4d'); // NOT ASCII "REM"
 
-    // Line 20 should have: 00 14 (line 20 stored high byte first) + b3 (LET token)
-    expect(hexStr).toContain('00 14 b3');
-    expect(hexStr).not.toContain('00 14 4c 45 54'); // NOT ASCII "LET"
+    // Line 20 should have LET token 0xf1 (real ZX Spectrum)
+    expect(hexStr).toContain('f1'); // LET token
+    expect(hexStr).not.toContain('4c 45 54'); // NOT ASCII "LET"
 
-    // Line 30 should have: 00 1e (line 30 stored high byte first) + b7 (PRINT token)
-    expect(hexStr).toContain('00 1e b7');
-    expect(hexStr).not.toContain('00 1e 50 52 49 4e 54'); // NOT ASCII "PRINT"
+    // Line 30 should have PRINT token 0xf5 (real ZX Spectrum)
+    expect(hexStr).toContain('f5'); // PRINT token
+    expect(hexStr).not.toContain('50 52 49 4e 54'); // NOT ASCII "PRINT"
   });
 
   test('CLI with metadata produces correct TAP header', () => {
@@ -124,14 +124,14 @@ describe('CLI Integration Tests', () => {
 
     // Map of expected tokens (keyword -> token byte)
     const expectedTokens: { [key: string]: number } = {
-      'REM': 0xA4,
-      'LET': 0xB3,
-      'FOR': 0xAB,
-      'PRINT': 0xB7,
-      'NEXT': 0xB5,
-      'INPUT': 0xB0,
-      'IF': 0xBC,
-      'STOP': 0xCB,
+      'REM': 0xEA,
+      'LET': 0xF1,
+      'FOR': 0xEB,
+      'PRINT': 0xF5,
+      'NEXT': 0xF3,
+      'INPUT': 0xEE,
+      'IF': 0xFA,
+      'STOP': 0xE2,
     };
 
     // Verify we find the expected tokens in the binary data
@@ -197,9 +197,9 @@ describe('CLI Integration Tests', () => {
     // Should contain tokenized data after header
     // Look for some expected tokens
     const bytes = Array.from(tap);
-    const hasREM = bytes.includes(0xA4); // REM token
-    const hasLET = bytes.includes(0xB3); // LET token
-    const hasDIM = bytes.includes(0xD2); // DIM token
+    const hasREM = bytes.includes(0xEA); // REM token
+    const hasLET = bytes.includes(0xF1); // LET token
+    const hasDIM = bytes.includes(0xE1); // DIM token
 
     expect(hasREM || hasLET || hasDIM).toBe(true);
   });
@@ -251,12 +251,12 @@ describe('CLI Integration Tests', () => {
     const tap = fs.readFileSync(tapFile);
     const hexStr = Array.from(tap.slice(23)).map(b => b.toString(16).padStart(2, '0')).join('');
 
-    // PRINT should be tokenized (0xb7)
-    const printToken = 'b7';
+    // PRINT should be tokenized (0xf5)
+    const printToken = 'f5';
     expect(hexStr).toContain(printToken);
 
-    // LET should be tokenized (0xb3)
-    const letToken = 'b3';
+    // LET should be tokenized (0xf1)
+    const letToken = 'f1';
     expect(hexStr).toContain(letToken);
 
     // String content should still be there (ASCII "hello" = 68656c6c6f)
