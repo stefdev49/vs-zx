@@ -1,11 +1,16 @@
 // @ts-check
 // playwright.config.js
 // https://playwright.dev/docs/test-configuration
+//
+// NOTE: These tests validate PROJECT INFRASTRUCTURE, not the VS Code extension.
+// For real VS Code extension E2E tests, run:
+//   npm run test:vscode-e2e
+//
 const { defineConfig, devices } = require("@playwright/test");
 
 module.exports = defineConfig({
   testDir: "./tests",
-  testMatch: "**/*.spec.ts",
+  testMatch: ["infrastructure.spec.ts"],  // Only run infrastructure tests
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -15,22 +20,11 @@ module.exports = defineConfig({
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
-    // Uncomment the line below to always run in headed mode (show browser window)
-    // headless: false,
   },
   projects: [
     {
       name: "chromium",
-      use: {
-        ...devices["Desktop Chrome"],
-        // Configure for VS Code extension testing
-        launchOptions: {
-          args: [
-            "--disable-extensions-except=/home/stef/projets/vs-zx/vscode-extension",
-            "--load-extension=/home/stef/projets/vs-zx/vscode-extension",
-          ],
-        },
-      },
+      use: { ...devices["Desktop Chrome"] },
     },
   ],
   // Output directory for test artifacts

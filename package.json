@@ -36,7 +36,7 @@
     "test:playwright": "npx playwright test",
     "test:playwright:ui": "npx playwright test --ui",
     "test:playwright:report": "npx playwright show-report",
-    "test:vscode-e2e": "node tests/vscode-extension-e2e.spec.js",
+    "test:vscode-e2e": "cd tests && npm run test:e2e",
     "lint": "npm run lint --workspaces",
     "format": "prettier --write .",
     "package": "cd vscode-extension && npm version patch --no-git-tag-version && cd .. && npm run rebuild-native && cd vscode-extension && npx vsce package --no-dependencies && echo 'VS Code extension packaged successfully in vscode-extension/'",

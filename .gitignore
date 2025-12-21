@@ -40,3 +40,4 @@ samples/ZXBASIC.mdr
 samples/5 REM hangmanSIN.bas
 .vscode-test/
 playwright-report/
+test-screenshots/

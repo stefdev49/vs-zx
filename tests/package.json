@@ -2,16 +2,23 @@
   "name": "tests",
   "version": "1.0.0",
   "private": true,
-  "type": "module",
   "devDependencies": {
     "@playwright/test": "^1.57.0",
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.0",
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.94.0",
+    "@vscode/test-electron": "^2.5.2",
+    "glob": "^10.0.0",
     "mocha": "^10.0.0",
-    "@types/mocha": "^10.0.0"
+    "typescript": "^5.0.0"
   },
   "scripts": {
+    "compile": "tsc -p e2e/tsconfig.json",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
     "test:report": "playwright show-report",
+    "test:e2e": "npm run compile && node e2e/out/run-vscode-tests.js",
     "test:mocha": "mocha tests/vscode-extension-test-runner.js"
   }
 }

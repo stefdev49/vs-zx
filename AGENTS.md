@@ -33,10 +33,21 @@
 
 ## E2E Testing Rules
 
-- Use Playwright for end-to-end testing
-- Follow existing test patterns in tests/ directory
-- Use TypeScript for test files (.spec.ts)
+### VS Code Extension E2E Tests (`npm run test:vscode-e2e`)
+- Uses `@vscode/test-electron` to launch real VS Code instances
+- Tests run inside VS Code using Mocha
+- Test files: `tests/e2e/suite/*.test.ts`
+- **10 tests** covering extension activation, syntax highlighting, formatting, diagnostics, completion, hover, go-to-definition, MDR commands
+- Use VS Code API for interactions (no browser simulation)
+
+### Infrastructure Tests (`npm run test:playwright`)
+- Uses Playwright for fast validation tests
+- Test file: `tests/infrastructure.spec.ts`
+- **6 tests** covering VSIX existence, package.json, compiled outputs, converter library, MDR round-trip
+- No browser needed - validates build artifacts
+
+### General Rules
+- Use TypeScript for test files
 - Include proper setup and teardown in tests
 - Use descriptive test names and assertions
-- **15 tests** covering all major functionality
-- See [BROWSER_VISIBILITY_GUIDE.md](BROWSER_VISIBILITY_GUIDE.md) for browser visibility options
+- State captures saved to `test-screenshots/` directory

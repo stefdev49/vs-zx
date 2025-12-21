@@ -6,41 +6,47 @@ It is currently in **beta**. Only pure BASIC programs are supported.
 
 ## End-to-End Testing
 
-The project includes comprehensive E2E testing using Playwright:
+The project includes comprehensive testing at multiple levels:
 
-- **15 tests** covering all major functionality
-- **Playwright** test framework with Chromium support
-- **VS Code extension testing** infrastructure
-- **Automated formatting** test cases with GUI visualization
-- **Screenshot capturing** for documentation and debugging
+### VS Code Extension E2E Tests
 
-### Running E2E Tests
+Real end-to-end tests that launch VS Code with the extension loaded:
+
+- **10 tests** running inside actual VS Code instance
+- Uses `@vscode/test-electron` framework
+- Tests extension activation, language recognition, formatting, diagnostics, completion, hover, go-to-definition
+- Captures state snapshots for each test step
 
 ```bash
-# Run all E2E tests
-npm run test:playwright
+# Run VS Code E2E tests (launches real VS Code)
+npm run test:vscode-e2e
+```
 
-# Run with interactive UI
-npm run test:playwright:ui
+### Infrastructure Tests
+
+Fast validation tests using Playwright:
+
+- **6 tests** for project infrastructure validation
+- Verifies VSIX package, compiled outputs, converter library
+- Tests MDR round-trip functionality
+
+```bash
+# Run infrastructure tests
+npm run test:playwright
 
 # View test report
 npm run test:playwright:report
-
-# Run specific test file
-npx playwright test tests/vscode-format-test
 ```
 
 ### Test Results
 
 ```
-✅ 15/15 tests passing
-✅ Playwright infrastructure fully functional
-✅ VS Code extension testing setup complete
-✅ Screenshot capturing working (4 screenshots)
+✅ 10/10 VS Code E2E tests passing
+✅ 6/6 Infrastructure tests passing
+✅ Real VS Code GUI testing working
+✅ State capturing for debugging
 ✅ Production-ready test suite
 ```
-
-See [E2E_TEST_GUIDE.md](E2E_TEST_GUIDE.md) for detailed testing instructions.
 
 ## Features
 
@@ -296,47 +302,57 @@ Press `Ctrl+Shift+U` or click View > Output and select "ZX Spectrum Recording" t
 
 ## Testing
 
-The VS-ZX project includes a comprehensive E2E testing suite using Playwright:
+The VS-ZX project includes comprehensive testing at two levels:
 
-### Test Features
+### VS Code Extension E2E Tests
 
-- **11 automated tests** covering all major functionality
-- **Playwright test framework** with Chromium browser support
-- **VS Code extension testing** infrastructure
-- **Automated file formatting** test cases
-- **HTML reporting** with screenshots and videos
-
-### Running Tests
+Real end-to-end tests that launch an actual VS Code instance:
 
 ```bash
-# Run all E2E tests
-npm run test:playwright
+# Run VS Code E2E tests (launches real VS Code)
+npm run test:vscode-e2e
+```
 
-# Run with interactive UI
-npm run test:playwright:ui
+**Test Coverage (10 tests):**
+
+- ✅ Extension loading and activation
+- ✅ Language recognition for .bas files  
+- ✅ Syntax highlighting with semantic tokens
+- ✅ Document formatting command
+- ✅ Diagnostics for code errors
+- ✅ Code completion
+- ✅ Hover information
+- ✅ Go To Definition for GOTO/GOSUB
+- ✅ Sample file loading
+- ✅ MDR command availability
+
+### Infrastructure Tests
+
+Fast validation tests using Playwright:
+
+```bash
+# Run infrastructure tests
+npm run test:playwright
 
 # View test report
 npm run test:playwright:report
-
-# Run specific test file
-npx playwright test tests/vscode-format-test
 ```
 
-### Test Coverage
+**Test Coverage (6 tests):**
 
-- ✅ Extension loading and activation
-- ✅ File formatting and transformation
-- ✅ VS Code integration
-- ✅ Code validation and diagnostics
-- ✅ Environment setup verification
+- ✅ VSIX package existence
+- ✅ Extension package.json validation
+- ✅ Compiled outputs verification
+- ✅ Sample files availability
+- ✅ Converter library functions
+- ✅ MDR round-trip functionality
 
 ### Test Artifacts
 
-All test results are stored in the `test-results/` directory:
+All test results are stored in the `test-results/` and `test-screenshots/` directories:
 
+- State captures for each test step
 - HTML reports for easy viewing
-- Screenshots of test failures
-- Videos of test execution
 - Traces for debugging
 
 ### CI Integration
