@@ -18,6 +18,7 @@
 - Use consistent naming conventions (PascalCase for components, camelCase for variables)
 - Include JSDoc comments for all functions
 - Handle errors gracefully with try/catch blocks
+- **Linting is not needed** - it is considered harmful for this project since no human ever reads the code
 
 ## Cursor Rules
 
@@ -34,19 +35,22 @@
 ## E2E Testing Rules
 
 ### VS Code Extension E2E Tests (`npm run test:vscode-e2e`)
+
 - Uses `@vscode/test-electron` to launch real VS Code instances
 - Tests run inside VS Code using Mocha
 - Test files: `tests/e2e/suite/*.test.ts`
-- **10 tests** covering extension activation, syntax highlighting, formatting, diagnostics, completion, hover, go-to-definition, MDR commands
+- **14 tests** covering extension activation, syntax highlighting, formatting, diagnostics, completion, hover, go-to-definition, refactoring (extract variable, renumber lines), TZX commands, audio playback/recording, MDR commands
 - Use VS Code API for interactions (no browser simulation)
 
 ### Infrastructure Tests (`npm run test:playwright`)
+
 - Uses Playwright for fast validation tests
 - Test file: `tests/infrastructure.spec.ts`
 - **6 tests** covering VSIX existence, package.json, compiled outputs, converter library, MDR round-trip
 - No browser needed - validates build artifacts
 
 ### General Rules
+
 - Use TypeScript for test files
 - Include proper setup and teardown in tests
 - Use descriptive test names and assertions
