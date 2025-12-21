@@ -1,0 +1,17 @@
+{
+  "name": "tests",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "mocha": "^10.0.0",
+    "@types/mocha": "^10.0.0"
+  },
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:report": "playwright show-report",
+    "test:mocha": "mocha tests/vscode-extension-test-runner.js"
+  }
+}

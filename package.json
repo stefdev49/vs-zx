@@ -11,13 +11,18 @@
     "tests"
   ],
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "eslint": "^8.0.0",
-    "prettier": "^3.0.0",
-    "typescript": "^5.0.0",
-    "jest": "^29.0.0",
+    "@playwright/test": "^1.57.0",
     "@types/jest": "^29.0.0",
-    "ts-jest": "^29.0.0"
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.0.0",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/test-web": "^0.0.77",
+    "eslint": "^8.0.0",
+    "jest": "^29.0.0",
+    "mocha": "^11.7.5",
+    "prettier": "^3.0.0",
+    "ts-jest": "^29.0.0",
+    "typescript": "^5.0.0"
   },
   "engines": {
     "node": ">=18"
@@ -28,6 +33,10 @@
     "rebuild-native": "npm --workspaces rebuild --build-from-source || true",
     "rebuild-electron": "node -e \"if(!process.env.ELECTRON_VERSION){console.error('Set ELECTRON_VERSION env var');process.exit(1);}\" && npx electron-rebuild -f -w serialport -v $ELECTRON_VERSION || true",
     "test": "npm run test --workspaces",
+    "test:playwright": "npx playwright test",
+    "test:playwright:ui": "npx playwright test --ui",
+    "test:playwright:report": "npx playwright show-report",
+    "test:vscode-e2e": "node tests/vscode-extension-e2e.spec.js",
     "lint": "npm run lint --workspaces",
     "format": "prettier --write .",
     "package": "cd vscode-extension && npm version patch --no-git-tag-version && cd .. && npm run rebuild-native && cd vscode-extension && npx vsce package --no-dependencies && echo 'VS Code extension packaged successfully in vscode-extension/'",
