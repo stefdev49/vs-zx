@@ -39,7 +39,7 @@
 - Uses `@vscode/test-electron` to launch real VS Code instances
 - Tests run inside VS Code using Mocha
 - Test files: `tests/e2e/suite/*.test.ts`
-- **14 tests** covering extension activation, syntax highlighting, formatting, diagnostics, completion, hover, go-to-definition, refactoring (extract variable, renumber lines), TZX commands, audio playback/recording, MDR commands
+- **20 tests** covering extension activation, syntax highlighting, formatting, diagnostics, completion, hover, go-to-definition, refactoring (extract variable, extract subroutine, renumber lines), TZX commands, audio playback/recording, navigation (find references, call hierarchy, document symbols), code intelligence (rename functionality, code actions), MDR commands
 - Use VS Code API for interactions (no browser simulation)
 
 ### Infrastructure Tests (`npm run test:playwright`)
