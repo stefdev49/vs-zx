@@ -60,7 +60,8 @@ Legend: `[x]` = Done, `[ ]` = To Do, `[ ] (WIP)` = In Progress.
 - [x] **Record from ZX Spectrum** - Convert BASIC programs directly from ZX Spectrum audio using tzxwav and audio recording, no file writing needed
 - [x] **Advanced Refactoring** - Extract variables, extract subroutines, and other code transformations
 - [x] **Code Formatting** - Automatic line numbering, keyword uppercasing, and code cleanup
-- [ ] **Save to mdv** - Convert BASIC programs to MDV format
+- [x] **Save to mdr** - Convert BASIC programs to MDR format
+- [x] **Load from mdr** - Load BASIC program from MDR format
 - [ ] **Network transfer** - Transfer BASIC programs to ZX Spectrum using ZX Interface 1. (will need a modified https://oqtadrive.org/ version)
 
 ## LSP Feature Roadmap

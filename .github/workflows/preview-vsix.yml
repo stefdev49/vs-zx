@@ -1,0 +1,135 @@
+name: Build & Publish Preview VSIX
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+jobs:
+  build-and-publish:
+    name: Build and publish preview VSIX
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Cache root node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            **/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies (root)
+        run: npm ci
+
+      - name: Build workspace
+        run: npm run build --if-present
+
+      - name: Cache vscode-extension node_modules
+        uses: actions/cache@v4
+        with:
+          path: vscode-extension/node_modules
+          key: ${{ runner.os }}-vscode-ext-node-${{ hashFiles('vscode-extension/**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-vscode-ext-node-
+
+      - name: Package VS Code extension
+        run: |
+          npm run clean:vsix || true
+          cd vscode-extension
+          npm ci
+          # bump internal version used in package.json without creating a git tag
+          npm version prerelease --preid=preview --no-git-tag-version || true
+          npm run build --if-present || true
+          # create VSIX package
+          npx vsce package --no-dependencies
+        working-directory: ./vscode-extension
+
+      - name: Find generated VSIX
+        id: vsix
+        run: |
+          VSIX=$(ls -t vscode-extension/*.vsix | head -n1 || true)
+          echo "vsix=$VSIX" >> $GITHUB_OUTPUT
+
+      - name: Read extension package version
+        id: getversion
+        run: |
+          if [ -f vscode-extension/package.json ]; then
+            VERSION=$(node -p "require('./vscode-extension/package.json').version") || VERSION="unknown"
+          else
+            VERSION="unknown"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Upload VSIX as Actions artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zx-basic-vscode-extension-${{ steps.getversion.outputs.version }}-${{ github.run_id }}.vsix
+          path: ${{ steps.vsix.outputs.vsix }}
+
+      - name: Create or update draft prerelease with release notes
+        id: release
+        uses: peter-evans/create-or-update-release@v3
+        with:
+          tag_name: "preview-${{ github.run_id }}"
+          release_name: "Preview VSIX - ${{ github.ref_name || github.run_id }}"
+          body: |
+            Preview VSIX built by workflow `${{ github.workflow }}` on `${{ github.ref }}`.
+            Commit: ${{ github.sha }}
+          draft: true
+          prerelease: true
+          # Automatically generate release notes from commits
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload VSIX asset to release (draft)
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.release.outputs.upload_url }}
+          asset_path: ${{ steps.vsix.outputs.vsix }}
+          asset_name: zx-basic-vscode-extension-${{ steps.getversion.outputs.version }}-${{ github.run_id }}.vsix
+          asset_content_type: application/octet-stream
+
+      - name: Publish a non-draft release (optional)
+        if: ${{ secrets.RELEASE_TOKEN != '' }}
+        id: publish
+        uses: peter-evans/create-or-update-release@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        with:
+          tag_name: "release-${{ github.run_id }}"
+          release_name: "Release VSIX - ${{ github.ref_name || github.run_id }}"
+          body: |
+            Published VSIX built by workflow `${{ github.workflow }}` on `${{ github.ref }}`.
+            Commit: ${{ github.sha }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+
+      - name: Upload VSIX asset to published release (optional)
+        if: ${{ secrets.RELEASE_TOKEN != '' }}
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        with:
+          upload_url: ${{ steps.publish.outputs.upload_url }}
+          asset_path: ${{ steps.vsix.outputs.vsix }}
+          asset_name: zx-basic-vscode-extension-${{ steps.getversion.outputs.version }}-${{ github.run_id }}.vsix
+          asset_content_type: application/octet-stream
