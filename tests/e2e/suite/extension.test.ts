@@ -966,6 +966,116 @@ suite("ZX BASIC Extension E2E Tests", () => {
     }
   });
 
+  test("Should provide signature help for functions", async () => {
+    console.log("📋 Test: Signature help");
+
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    assert.ok(workspaceFolder, "Workspace folder should exist");
+
+    const testFile = path.join(
+      workspaceFolder.uri.fsPath,
+      "test-signature.bas",
+    );
+    // File with function call that should trigger signature help
+    fs.writeFileSync(
+      testFile,
+      `10 LET X = ABS(
+20 PRINT CHR$(`,
+    );
+
+    try {
+      const document = await openFile(testFile);
+
+      // Position cursor inside function parentheses on line 1
+      const position = new vscode.Position(0, 14); // After "ABS("
+
+      const signatureHelp = await vscode.commands.executeCommand<
+        vscode.SignatureHelp
+      >("vscode.executeSignatureHelpProvider", document.uri, position);
+
+      console.log(
+        `  Signature help: ${signatureHelp?.signatures?.length || 0} signatures`,
+      );
+      if (signatureHelp?.signatures?.length) {
+        signatureHelp.signatures.forEach((sig, i) => {
+          console.log(`    [${i}] ${sig.label}`);
+          if (sig.documentation) {
+            console.log(
+              `        Doc: ${typeof sig.documentation === "string" ? sig.documentation.slice(0, 50) : "MarkdownString"}`,
+            );
+          }
+        });
+      }
+
+      await takeScreenshot("25-signature-help");
+      console.log("✅ Signature help test completed");
+    } finally {
+      if (fs.existsSync(testFile)) {
+        fs.unlinkSync(testFile);
+      }
+    }
+  });
+
+  test("Should provide code lens for line references", async () => {
+    console.log("📋 Test: Code lens");
+
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    assert.ok(workspaceFolder, "Workspace folder should exist");
+
+    const testFile = path.join(workspaceFolder.uri.fsPath, "test-codelens.bas");
+    // File with GOTO/GOSUB references to trigger code lens
+    fs.writeFileSync(
+      testFile,
+      `10 REM Main program
+20 GOSUB 100
+30 GOTO 100
+40 GOSUB 100
+50 END
+100 REM Subroutine - should show "3 references"
+110 RETURN`,
+    );
+
+    try {
+      const document = await openFile(testFile);
+
+      // Wait for code lens to be computed
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      const codeLenses = await vscode.commands.executeCommand<vscode.CodeLens[]>(
+        "vscode.executeCodeLensProvider",
+        document.uri,
+      );
+
+      console.log(`  Found ${codeLenses?.length || 0} code lenses`);
+      if (codeLenses?.length) {
+        codeLenses.forEach((lens, i) => {
+          const line = lens.range.start.line;
+          const title = lens.command?.title || "(no command)";
+          console.log(`    [${i}] Line ${line + 1}: ${title}`);
+        });
+
+        // Line 100 should have a code lens showing references
+        const line100Lens = codeLenses.find(
+          (lens) => lens.range.start.line === 5,
+        );
+        if (line100Lens?.command?.title) {
+          assert.ok(
+            line100Lens.command.title.includes("reference"),
+            "Code lens should show reference count",
+          );
+          console.log(`  ✓ Line 100 shows: "${line100Lens.command.title}"`);
+        }
+      }
+
+      await takeScreenshot("26-code-lens");
+      console.log("✅ Code lens test completed");
+    } finally {
+      if (fs.existsSync(testFile)) {
+        fs.unlinkSync(testFile);
+      }
+    }
+  });
+
   test("MDR save command should be available", async () => {
     console.log("📋 Test: MDR command availability");
 
@@ -987,7 +1097,7 @@ suite("ZX BASIC Extension E2E Tests", () => {
     console.log(`  saveToMdr: ${hasSaveToMdr ? "available" : "not found"}`);
     console.log(`  loadFromMdr: ${hasLoadFromMdr ? "available" : "not found"}`);
 
-    await takeScreenshot("25-mdr-commands");
+    await takeScreenshot("27-mdr-commands");
     console.log("✅ Command availability test completed");
   });
 

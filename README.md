@@ -12,9 +12,9 @@ The project includes comprehensive testing at multiple levels:
 
 Real end-to-end tests that launch VS Code with the extension loaded:
 
-- **10 tests** running inside actual VS Code instance
+- **22 tests** running inside actual VS Code instance
 - Uses `@vscode/test-electron` framework
-- Tests extension activation, language recognition, formatting, diagnostics, completion, hover, go-to-definition
+- Tests extension activation, syntax highlighting, formatting, diagnostics, completion, hover, go-to-definition, refactoring (extract variable, extract subroutine, renumber lines), TZX commands, audio playback/recording, navigation (find references, call hierarchy, document symbols), code intelligence (rename functionality, code actions, signature help, code lens), MDR commands
 - Captures state snapshots for each test step
 
 ```bash
@@ -41,7 +41,7 @@ npm run test:playwright:report
 ### Test Results
 
 ```
-✅ 10/10 VS Code E2E tests passing
+✅ 22/22 VS Code E2E tests passing
 ✅ 6/6 Infrastructure tests passing
 ✅ Real VS Code GUI testing working
 ✅ State capturing for debugging
@@ -85,19 +85,19 @@ Legend: `[x]` = Done, `[ ]` = To Do, `[ ] (WIP)` = In Progress.
 - [x] Completion Resolve — Additional detail provided in `onCompletionResolve`.
 - [x] Signature Help — Command signatures exposed through `onSignatureHelp`.
 - [x] Code Actions — Quick fixes/refactors registered via `onCodeAction`:
-  - Extract Variable: Extract expressions to variables with proper line numbering
-  - Extract Subroutine: Move code blocks to subroutines at end of program
-  - Add/renumber line numbers, insert missing RETURN/NEXT, suggest DIM, uppercase keywords.
+  - [x] Extract Variable: Extract expressions to variables with proper line numbering
+  - [x] Extract Subroutine: Move code blocks to subroutines at end of program
+  - [x] Add/renumber line numbers, insert missing RETURN/NEXT, suggest DIM, uppercase keywords.
 - [x] Code Lens — Inline line-number reference counters powered by Code Lens.
 - [x] Diagnostics — Extensive validation produced in `validateTextDocument`:
-  - Line number validation (1-9999, must be integers)
-  - Duplicate line number detection
-  - **Missing line number detection** - Catches lines without line numbers that cause TZX conversion errors
-  - FOR/NEXT matching with variable tracking
-  - IF/THEN validation
-  - Type checking (string vs numeric operations)
-  - Color value validation
-  - Array dimension validation
+  - [x] Line number validation (1-9999, must be integers)
+  - [x] Duplicate line number detection
+  - [x] **Missing line number detection** - Catches lines without line numbers that cause TZX conversion errors
+  - [x] FOR/NEXT matching with variable tracking
+  - [x] IF/THEN validation
+  - [x] Type checking (string vs numeric operations)
+  - [x] Color value validation
+  - [x] Array dimension validation
 - [x] Semantic Tokens — Rich highlighting via `onSemanticTokens`.
 
 ### Formatting & Refactoring
@@ -243,7 +243,7 @@ Run tests with `npm run test:playwright` to ensure everything works correctly.
 **Test Results:**
 
 ```
-✅ 15/15 tests passing
+✅ 28/28 tests passing (22 VS Code E2E + 6 Infrastructure)
 ✅ All tests working with screenshot capturing
 ✅ Production-ready E2E testing infrastructure
 ```
@@ -314,7 +314,7 @@ Real end-to-end tests that launch an actual VS Code instance:
 npm run test:vscode-e2e
 ```
 
-**Test Coverage (10 tests):**
+**Test Coverage (22 tests):**
 
 - ✅ Extension loading and activation
 - ✅ Language recognition for .bas files  
@@ -325,6 +325,18 @@ npm run test:vscode-e2e
 - ✅ Hover information
 - ✅ Go To Definition for GOTO/GOSUB
 - ✅ Sample file loading
+- ✅ Extract variable refactoring
+- ✅ Renumber lines refactoring
+- ✅ TZX save command
+- ✅ Audio playback functionality
+- ✅ Extract subroutine refactoring
+- ✅ Rename variables
+- ✅ Find all references
+- ✅ Call hierarchy for GOSUB
+- ✅ Document symbols for navigation
+- ✅ Code actions for quick fixes
+- ✅ Signature help for functions
+- ✅ Code lens for line references
 - ✅ MDR command availability
 
 ### Infrastructure Tests
