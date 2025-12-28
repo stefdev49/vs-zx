@@ -5,7 +5,8 @@
   "main": "out/keywords",
   "types": "out/keywords",
   "scripts": {
-    "build": "tsc -p ./"
+    "build": "tsc -p ./",
+    "test": "echo No tests"
   },
   "engines": {
     "node": ">=18"

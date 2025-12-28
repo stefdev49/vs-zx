@@ -533,21 +533,23 @@ export function findLastKeywordOnLine(lineText: string): string | null {
   for (const keyword of sortedKeywords) {
     const upperKeyword = keyword.toUpperCase();
     // Use case-insensitive regex to match any case
-    // Use direct regex construction
-    const pattern = "\b" + keyword + "\b";
-    const keywordPattern = new RegExp(pattern, "i");
+    // Construct regex with word boundaries
+    const keywordPattern = new RegExp("(^|\\s)" + keyword + "(\\s|$)", "gi");
 
     let match;
     while ((match = keywordPattern.exec(lineText)) !== null) {
+      // Calculate actual keyword position (skip the captured whitespace/start)
+      const actualPosition = match.index + (match[1] ? match[1].length : 0);
+      
       // Check if this is a valid keyword (not in string, not in comment, etc.)
-      const isValidContext = isValidKeywordContext(lineText, match.index);
+      const isValidContext = isValidKeywordContext(lineText, actualPosition);
 
-      if (isValidContext && match.index > foundPosition) {
+      if (isValidContext && actualPosition > foundPosition) {
         foundKeyword = lineText.substring(
-          match.index,
-          match.index + keyword.length,
+          actualPosition,
+          actualPosition + keyword.length,
         );
-        foundPosition = match.index;
+        foundPosition = actualPosition;
       }
     }
   }

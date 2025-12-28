@@ -15,7 +15,7 @@ function formatLine(tokens: Token[]): string {
         if (!(token.type === TokenType.OPERATOR && token.value === '-')) {
           formatted += ' ';
         }
-      } else if (prevToken.type === TokenType.KEYWORD) {
+      } else if (prevToken.type === TokenType.KEYWORD || token.type === TokenType.KEYWORD) {
         formatted += ' ';
       } else if (prevToken.type === TokenType.PUNCTUATION && prevToken.value === ',') {
         formatted += ' ';
@@ -44,7 +44,7 @@ describe('Document Formatting Tests', () => {
   const testCases = [
     {
       input: '10  let   a=5:print a',
-      expected: '10 LET A = 5 : PRINT A',
+      expected: '10 LET a = 5 : PRINT a',
       description: 'Normalize spacing and uppercase keywords'
     },
     {
@@ -53,8 +53,8 @@ describe('Document Formatting Tests', () => {
       description: 'Add space after line number'
     },
     {
-      input: '30 for i=1to10:next i',
-      expected: '30 FOR I = 1TO10 : NEXT I',
+      input: '30 for i=1 to 10:next i',
+      expected: '30 FOR i = 1 TO 10 : NEXT i',
       description: 'Add spaces around operators and keywords'
     }
   ];

@@ -4,7 +4,7 @@
 30 print i
 40 next i
 100gosub 500
-200end
+200stop
 500 rem Subroutine
 510 print "Sub"
 520RETURN

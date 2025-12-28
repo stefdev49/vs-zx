@@ -2691,6 +2691,37 @@ function analyzeVariableUsage(
           }
         }
 
+        // Special handling for INPUT LINE - check if there's an INPUT keyword earlier in the same statement
+        if (!isDeclaration && i > 1) {
+          const prevToken = tokens[i - 1];
+          if (
+            prevToken.type === TokenType.KEYWORD &&
+            prevToken.value.toUpperCase() === "LINE"
+          ) {
+            // Look back further for INPUT keyword
+            for (let j = i - 2; j >= 0; j--) {
+              const checkToken = tokens[j];
+              if (checkToken.line !== token.line) {
+                break; // Different line, stop looking
+              }
+              if (
+                checkToken.type === TokenType.KEYWORD &&
+                checkToken.value.toUpperCase() === "INPUT"
+              ) {
+                isDeclaration = true;
+                context = "INPUT";
+                break;
+              }
+              if (
+                checkToken.type === TokenType.STATEMENT_SEPARATOR ||
+                checkToken.type === TokenType.LINE_NUMBER
+              ) {
+                break; // Hit statement boundary
+              }
+            }
+          }
+        }
+
         // Check if it's a FOR loop variable
         if (i > 0 && tokens[i - 1].type === TokenType.FOR) {
           isDeclaration = true;

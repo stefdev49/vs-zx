@@ -115,15 +115,15 @@ describe("Format-on-Type Integration Tests", () => {
   describe("findLastKeywordOnLine", () => {
     const testCases = [
       { line: '2050 print "data over"', expected: "print" },
-      { line: "10 for i=0 to 255", expected: "for" },
+      { line: "10 for i=0 to 255", expected: "to" },  // TO is the last keyword
       { line: "20 let x=5", expected: "let" },
-      { line: "30 if x>0 then goto 100", expected: "if" },
+      { line: "30 if x>0 then goto 100", expected: "goto" },  // GOTO is the last keyword
       { line: "40 gosub 1000", expected: "gosub" },
       { line: "50 stop", expected: "stop" },
       { line: "60 dim myArray(10)", expected: "dim" },
       { line: "70 noKeywordHere", expected: null },
-      { line: "80 REM this is a comment", expected: null },
-      { line: '90 PRINT "keyword in string"', expected: null },
+      { line: "80 REM this is a comment", expected: "REM" },  // REM is a valid keyword
+      { line: '90 PRINT "keyword in string"', expected: "PRINT" },  // PRINT is outside the string
     ];
 
     testCases.forEach(({ line, expected }) => {

@@ -350,7 +350,10 @@ export class ZXBasicLexer {
       this.advance();
     }
 
-    let value = this.text.substring(start, this.position).toUpperCase();
+    // Store original text (preserve case)
+    const originalValue = this.text.substring(start, this.position);
+    // Use uppercase version for keyword checking
+    let value = originalValue.toUpperCase();
 
     // Special handling for REM comments - consume rest of line
     if (value === "REM") {
@@ -421,7 +424,8 @@ export class ZXBasicLexer {
 
     return {
       type: tokenType,
-      value,
+      // Use uppercase for keywords, preserve original case for identifiers
+      value: tokenType === TokenType.KEYWORD ? value : originalValue,
       line: this.line,
       start: startCol,
       end: this.column,

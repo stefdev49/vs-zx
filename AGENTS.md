@@ -3,7 +3,7 @@
 ## Build/Lint/Test Commands
 
 - Build: npm run build
-- Lint: npm run lint
+- Lint: no linting is needed
 - Test: npm run test
 - Run a single test: npm run test -- -t "test name"
 - E2E Tests: npm run test:playwright
@@ -18,7 +18,7 @@
 - Use consistent naming conventions (PascalCase for components, camelCase for variables)
 - Include JSDoc comments for all functions
 - Handle errors gracefully with try/catch blocks
-- **Linting is not needed** - it is considered harmful for this project since no human ever reads the code
+- **Linting is not needed** - never fix linting errors
 
 ## Cursor Rules
 
@@ -55,3 +55,5 @@
 - Include proper setup and teardown in tests
 - Use descriptive test names and assertions
 - State captures saved to `test-screenshots/` directory
+- no feature or fix can be considered done if some tests are failing
+- all failing tests must be fixed

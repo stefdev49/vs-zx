@@ -52,12 +52,12 @@ describe("ZXBasicLexer", () => {
 
   test("should reject underscores in variable names", () => {
     const tokens = lexer.tokenize("my_var");
-    // Should tokenize as MY (identifier), _ (invalid), VAR (identifier)
+    // Should tokenize as my (identifier), _ (invalid), var (identifier)
     expect(tokens).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ type: TokenType.IDENTIFIER, value: "MY" }),
+        expect.objectContaining({ type: TokenType.IDENTIFIER, value: "my" }),
         expect.objectContaining({ type: TokenType.INVALID, value: "_" }),
-        expect.objectContaining({ type: TokenType.IDENTIFIER, value: "VAR" }),
+        expect.objectContaining({ type: TokenType.IDENTIFIER, value: "var" }),
       ]),
     );
   });

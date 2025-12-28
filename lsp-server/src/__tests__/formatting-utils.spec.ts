@@ -98,7 +98,7 @@ describe("formatLine", () => {
     const result = formatLine(tokens, doc);
 
     expect(result).not.toBeNull();
-    expect(result?.newText).toBe("50 FOR I = 1 TO 255");
+    expect(result?.newText).toBe("50 FOR i = 1 TO 255");
   });
 
   it("should format FOR statements with STEP correctly", () => {
@@ -109,7 +109,7 @@ describe("formatLine", () => {
     const result = formatLine(tokens, doc);
 
     expect(result).not.toBeNull();
-    expect(result?.newText).toBe("60 FOR J = 10 TO 100 STEP 5");
+    expect(result?.newText).toBe("60 FOR j = 10 TO 100 STEP 5");
   });
 
   it("should handle numbers followed by keywords in other contexts", () => {
@@ -120,6 +120,6 @@ describe("formatLine", () => {
     const result = formatLine(tokens, doc);
 
     expect(result).not.toBeNull();
-    expect(result?.newText).toBe('70 IF X = 5 THEN PRINT "hello"');
+    expect(result?.newText).toBe('70 IF x = 5 THEN PRINT "hello"');
   });
 });

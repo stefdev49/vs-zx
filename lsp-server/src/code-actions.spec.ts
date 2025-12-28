@@ -49,7 +49,7 @@ describe('Code Actions Tests', () => {
     }
 
     expect(hasFor).toBe(true);
-    expect(forVar).toBe('I');
+    expect(forVar).toBe('i');
     expect(hasNext).toBe(false);
   });
 
