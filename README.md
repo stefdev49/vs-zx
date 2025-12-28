@@ -238,7 +238,7 @@ The extension includes comprehensive E2E tests that verify:
 - VS Code integration
 - Visual documentation generation
 
-Run tests with `npm run test:playwright` to ensure everything works correctly.
+Run tests with `npm run test:e2e` in `tests` to ensure everything works correctly.
 
 **Test Results:**
 

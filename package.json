@@ -32,7 +32,7 @@
     "build:tsc": "tsc --build",
     "rebuild-native": "npm --workspaces rebuild --build-from-source || true",
     "rebuild-electron": "node -e \"if(!process.env.ELECTRON_VERSION){console.error('Set ELECTRON_VERSION env var');process.exit(1);}\" && npx electron-rebuild -f -w serialport -v $ELECTRON_VERSION || true",
-    "test": "npm run test --workspaces",
+    "test": "npm run test --workspace=lsp-server && npm run test --workspace=converter && npm run test --workspace=rs232-transfer && npm run test --workspace=syntax-definitions",
     "test:playwright": "npx playwright test",
     "test:playwright:ui": "npx playwright test --ui",
     "test:playwright:report": "npx playwright show-report",
