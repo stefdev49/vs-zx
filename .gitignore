@@ -41,3 +41,4 @@ samples/5 REM hangmanSIN.bas
 .vscode-test/
 playwright-report/
 test-screenshots/
+tests/test-results/.last-run.json
