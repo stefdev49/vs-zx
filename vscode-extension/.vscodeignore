@@ -7,6 +7,5 @@ out/**/*.map
 **/node_modules
 .git
 .github
-README.md
 tests/
 *.log
