@@ -19,10 +19,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Use Node.js 18
+      - name: Use Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
       - name: Cache node_modules
         uses: actions/cache@v4
@@ -41,15 +41,28 @@ jobs:
         run: npm run build:tsc
 
       - name: Bundle lsp-server
-        run: cd lsp-server && npm run bundle
+        working-directory: lsp-server
+        run: npm run bundle
+
+      - name: Clean old VSIX files
+        run: rm -f vscode-extension/*.vsix || true
+
+      - name: Bundle VS Code extension
+        working-directory: vscode-extension
+        run: npm run bundle
+
+      - name: Copy built files
+        working-directory: vscode-extension
+        run: node ./scripts/copy-built.js
 
       - name: Package VS Code extension
+        working-directory: vscode-extension
+        env:
+          VSCE_SKIP_PREPUBLISH: true
         run: |
-          npm run clean:vsix || true
-          cd vscode-extension
           # bump internal version used in package.json without creating a git tag
           npm version prerelease --preid=preview --no-git-tag-version || true
-          # create VSIX package (prepublish will bundle and copy files)
+          # create VSIX package (skip prepublish since we already built)
           npx vsce package --no-dependencies
 
       - name: Find generated VSIX

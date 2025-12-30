@@ -9,7 +9,7 @@
     "test": "jest"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "dependencies": {
     "serialport": "^13.0.0"

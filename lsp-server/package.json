@@ -13,7 +13,7 @@
     "test": "jest --coverage --no-watch"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "dependencies": {
     "vscode-languageserver": "^9.0.0",
