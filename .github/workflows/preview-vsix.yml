@@ -41,7 +41,7 @@ jobs:
         run: npm run build:tsc
 
       - name: Bundle lsp-server
-        run: cd lsp-server && npm run bundle || true
+        run: cd lsp-server && npm run bundle
 
       - name: Package VS Code extension
         run: |
@@ -49,11 +49,8 @@ jobs:
           cd vscode-extension
           # bump internal version used in package.json without creating a git tag
           npm version prerelease --preid=preview --no-git-tag-version || true
-          # bundle and copy files
-          npm run bundle
-          node ./scripts/copy-built.js
-          # create VSIX package (skip prepublish since we already built)
-          npx vsce package --no-dependencies --no-update-package-json
+          # create VSIX package (prepublish will bundle and copy files)
+          npx vsce package --no-dependencies
 
       - name: Find generated VSIX
         id: vsix
