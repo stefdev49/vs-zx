@@ -43,3 +43,4 @@ playwright-report/
 test-screenshots/
 tests/test-results/.last-run.json
 .secrets
+test-results/.last-run.json

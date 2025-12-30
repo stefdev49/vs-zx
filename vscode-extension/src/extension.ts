@@ -245,6 +245,15 @@ export function activate(context: ExtensionContext) {
   // Register command for transfer (use source so bundler can include it)
   context.subscriptions.push(transferCmd.register());
 
+  // Register RS232 receive command
+  context.subscriptions.push(transferCmd.registerReceive());
+
+  // Register RS232 test command
+  context.subscriptions.push(transferCmd.registerTest());
+
+  // Register RS232 list ports command
+  context.subscriptions.push(transferCmd.registerListPorts());
+
   // Register command for save as TZX
   context.subscriptions.push(saveAsTzxCmd.register());
 

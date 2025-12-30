@@ -53,6 +53,10 @@ import {
   DocumentDiagnosticParams,
   TypeDefinitionParams,
   ImplementationParams,
+  DocumentColorParams,
+  ColorPresentationParams,
+  ColorInformation,
+  ColorPresentation,
 } from "vscode-languageserver/node";
 
 import { TextDocument } from "vscode-languageserver-textdocument";
@@ -74,6 +78,7 @@ import {
   buildLineReferenceMap,
 } from "./line-number-utils";
 import { findIdentifierReferenceRanges } from "./identifier-utils";
+import { getDocumentColors, getColorPresentations } from "./colorProvider";
 import {
   autoRenumberLines,
   formatLine,
@@ -309,6 +314,7 @@ connection.onInitialize((params: InitializeParams) => {
       },
       foldingRangeProvider: true,
       callHierarchyProvider: true,
+      colorProvider: true,
     },
   };
 });
@@ -4652,6 +4658,29 @@ connection.languages.callHierarchy.onOutgoingCalls(
     }
 
     return outgoingCalls;
+  },
+);
+
+// Document Color Provider - shows ZX Spectrum color swatches in the editor
+connection.onDocumentColor(
+  (params: DocumentColorParams): ColorInformation[] => {
+    const document = documents.get(params.textDocument.uri);
+    if (!document) {
+      return [];
+    }
+
+    const text = document.getText();
+    const lexer = new ZXBasicLexer();
+    const tokens = lexer.tokenize(text);
+
+    return getDocumentColors(tokens);
+  },
+);
+
+// Color Presentation Provider - converts picked colors to ZX color values
+connection.onColorPresentation(
+  (params: ColorPresentationParams): ColorPresentation[] => {
+    return getColorPresentations(params.color, params.range);
   },
 );
 

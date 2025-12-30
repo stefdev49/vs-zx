@@ -2,7 +2,8 @@
 ## ZX Spectrum BASIC Compliance & VS Code Integration
 
 **Created:** 22 November 2025  
-**Status:** Planning Phase  
+**Updated:** 30 December 2025  
+**Status:** Active Development  
 **Goal:** Make LSP server fully ZX Spectrum BASIC compliant and VS Code best-practice compliant
 
 ---
@@ -10,88 +11,92 @@
 ## Current State Analysis
 
 ### ✅ Working Features
-- **Lexer:** Tokenizes basic ZX BASIC syntax (keywords, operators, numbers, strings, identifiers)
-- **Parser:** Parses expressions with correct operator precedence
-- **Completion:** Basic keyword and function completion with prefix filtering
+- **Lexer:** Full ZX BASIC tokenization (keywords, operators, numbers, strings, identifiers, line numbers, multi-statement lines)
+- **Parser:** Parses expressions and statements with correct operator precedence
+- **Completion:** Comprehensive keyword, function, and variable completion with context awareness
 - **Hover:** Documentation for keywords/functions on hover
-- **Signature Help:** Parameter hints for functions
-- **Diagnostics:** Basic syntax error detection
-- **Testing:** 38 tests passing with 88.85% code coverage
+- **Signature Help:** Parameter hints for functions and commands
+- **Diagnostics:** Extensive validation (line numbers, FOR/NEXT matching, type checking, color values, arrays)
+- **Refactoring:** Extract variable, extract subroutine, rename, renumber lines
+- **Navigation:** Go-to-definition, find references, call hierarchy, document symbols
+- **Code Lens:** Line number reference counters
+- **Testing:** 418 tests passing with 94%+ coverage on core modules (zxbasic.ts, formatting-utils.ts)
 
-### ❌ Missing ZX Spectrum BASIC Features
+### ✅ Implemented ZX Spectrum BASIC Features
 
-#### 1. **Incomplete Keyword Coverage**
-- Missing keywords: `PRINT AT`, `GO SUB`, `GO TO`, `DEF FN`, `LLIST`, `LPRINT`
-- Missing ZX 128K keywords: `SPECTRUM`, `PLAY` (partially)
-- Missing Interface 1 keywords: `CAT*`, `LOAD*`, `SAVE*`, `MERGE*`, `VERIFY*`, `FORMAT*`
-- Missing control flow: `CONTINUE`, `ELSE` (in multi-line IF)
-- Missing graphics: `LINE` command
+#### 1. **Keyword Coverage** ✅
+- All basic keywords supported: `PRINT AT`, `GO SUB`, `GO TO`, `DEF FN`, `LLIST`, `LPRINT`
+- ZX 128K keywords: `SPECTRUM`, `PLAY`
+- Interface 1 keywords: `CAT`, `LOAD`, `SAVE`, `MERGE`, `VERIFY`, `FORMAT`
+- Control flow: `CONTINUE`, `ELSE`
+- Graphics: `LINE` command
 
-#### 2. **Incomplete Function/Command Support**
-Functions in `syntax-definitions/keywords.ts` not in LSP:
+#### 2. **Function/Command Support** ✅
+All functions from `syntax-definitions/keywords.ts` implemented:
 - Trigonometric: `ACS`, `ASN` (arc cosine/sine)
 - Math: `SGN` (sign), `PI` (constant)
 - String: `VAL$`
 - I/O: `IN`, `OUT`, `TAB`, `AT`
 - Special: `FN` (user-defined functions)
 
-#### 3. **ZX BASIC Syntax Not Handled**
-- **Line numbers:** Not tokenized or validated
-- **Multi-statement lines:** Colon (`:`) separator not handled
-- **String variables:** `$` suffix recognition incomplete
-- **Numeric variables:** `%` suffix for integers not validated
-- **Array subscripts:** No validation of DIM arrays
-- **Slicing:** String slicing `a$(n TO m)` not parsed
-- **TAB/AT positioning:** `PRINT AT line, col; expr` not recognized
-- **Color codes:** Embedded codes in PRINT not handled
-- **REM comments:** Not properly lexed (should consume entire line)
-- **Multi-line IF THEN:** ZX doesn't support multi-line IF blocks
-- **GO TO vs GOTO:** Both forms valid, need normalization
+#### 3. **ZX BASIC Syntax Handled** ✅
+- **Line numbers:** Tokenized and validated (1-9999)
+- **Multi-statement lines:** Colon (`:`) separator fully supported
+- **String variables:** `$` suffix recognition complete
+- **Numeric variables:** `%` suffix for integers validated
+- **Array subscripts:** DIM array validation implemented
+- **Color codes:** Color value validation (0-7, 8-9)
+- **REM comments:** Properly lexed (consumes entire line)
+- **GO TO vs GOTO:** Both forms recognized
 
-#### 4. **Parser Limitations**
-- Only parses expressions, not full statements
-- No AST for: LET assignments, IF conditions, FOR loops, PRINT statements
-- No validation of statement structure (e.g., `FOR` must have matching `NEXT`)
-- No scope tracking for variables
-- No type checking (string vs numeric variables)
+### ⏳ Remaining ZX Spectrum BASIC Features
 
-#### 5. **Diagnostic Limitations**
-- Generic error messages
-- No line number validation (must be 1-9999)
-- No duplicate line number detection
-- No unreachable code detection (after STOP, RETURN, GOTO)
-- No array bounds checking
-- No undefined variable warnings
+#### 1. **Advanced Syntax**
+- **Slicing:** String slicing `a$(n TO m)` parsing
+- **TAB/AT positioning:** Full `PRINT AT line, col; expr` parsing
+- **Embedded control codes:** Control codes in strings
 
-### ❌ Missing VS Code Best Practices
+#### 2. **Parser Enhancements**
+- Full DEF FN parsing: `DEF FN name(params) = expression`
+- String slicing: `var$(start TO end)`
+- Full TAB and AT within PRINT
 
-#### 1. **Language Features Not Implemented**
-- **Document Symbols:** No outline view for line numbers/labels
-- **Folding:** No folding ranges for procedures/loops
-- **Formatting:** No document formatting provider
-- **Rename:** No rename refactoring for variables
-- **References:** No find all references for variables/line numbers
-- **Definition:** No go-to-definition for GOSUB/GOTO targets
-- **Code Actions:** No quick fixes for common errors
-- **Semantic Tokens:** No semantic highlighting
+#### 3. **Additional Diagnostics**
+- Unreachable code detection (after STOP, RETURN, GOTO)
+- Undefined variable warnings
 
-#### 2. **Configuration Missing**
-- No user settings for:
+### ✅ Implemented VS Code Best Practices
+
+#### 1. **Language Features Implemented**
+- **Document Symbols:** Outline view for line numbers/labels ✅
+- **Folding:** Folding ranges for procedures/loops ✅
+- **Formatting:** Document formatting provider ✅
+- **Rename:** Rename refactoring for variables and line numbers ✅
+- **References:** Find all references for variables/line numbers ✅
+- **Definition:** Go-to-definition for GOSUB/GOTO targets ✅
+- **Code Actions:** Quick fixes and refactoring (extract variable, extract subroutine, renumber) ✅
+- **Semantic Tokens:** Semantic highlighting ✅
+- **Code Lens:** Line number reference counters ✅
+- **Call Hierarchy:** Incoming/outgoing GOSUB calls ✅
+
+### ⏳ Remaining VS Code Features
+
+#### 1. **Configuration Enhancements**
+- User settings for:
   - ZX model (48K, 128K, Interface 1)
   - Strict mode (warn about non-standard syntax)
-  - Line number auto-increment
   - Max line length warnings (ZX limit)
 
-#### 3. **Workspace Features**
-- No multi-file support (LOAD, MERGE references)
-- No project structure understanding
-- No workspace symbols provider
+#### 2. **Workspace Features**
+- Multi-file support (LOAD, MERGE references)
+- Workspace symbols provider
 
-#### 4. **Developer Experience**
-- No code snippets for common patterns
-- No IntelliSense for variable names
-- No parameter hints for all commands (only functions)
-- Completion doesn't respect context (statements vs expressions)
+#### 3. **Additional Features**
+- Range Formatting
+- On Type Formatting
+- Selection Range
+- Inlay Hints
+- Document Color
 
 ---
 

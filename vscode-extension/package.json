@@ -2,7 +2,7 @@
   "name": "zx-basic-vscode-extension",
   "repository": "git+https://github.com/stef/vs-zx.git",
   "displayName": "ZX BASIC Development Environment",
-  "version": "1.0.168-preview.1",
+  "version": "1.0.168",
   "description": "VS Code extension for ZX Spectrum BASIC development with Interface 1 transfer",
   "license": "MIT",
   "icon": "icon.png",
@@ -39,8 +39,27 @@
     "commands": [
       {
         "command": "zx-basic.transfer",
-        "title": "Transfer to ZX Spectrum",
-        "category": "ZX BASIC"
+        "title": "Send via RS232",
+        "category": "ZX BASIC",
+        "icon": "$(arrow-up)"
+      },
+      {
+        "command": "zx-basic.receiveFromZx",
+        "title": "Receive via RS232",
+        "category": "ZX BASIC",
+        "icon": "$(arrow-down)"
+      },
+      {
+        "command": "zx-basic.testRS232",
+        "title": "Test RS232 Connection",
+        "category": "ZX BASIC",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "zx-basic.listSerialPorts",
+        "title": "List Serial Ports",
+        "category": "ZX BASIC",
+        "icon": "$(list-flat)"
       },
       {
         "command": "zx-basic.saveAsTzx",
@@ -104,6 +123,17 @@
         {
           "command": "zx-basic.transfer",
           "when": "editorLangId == zx-basic"
+        },
+        {
+          "command": "zx-basic.receiveFromZx",
+          "when": "editorLangId == zx-basic"
+        },
+        {
+          "command": "zx-basic.testRS232",
+          "when": "editorLangId == zx-basic"
+        },
+        {
+          "command": "zx-basic.listSerialPorts"
         },
         {
           "command": "zx-basic.saveAsTzx",
@@ -302,6 +332,39 @@
                 "description": "Maximum number of retries when reading problematic sectors from physical Microdrive cartridges"
               }
             }
+          },
+          "zxBasic.rs232.port": {
+            "type": "string",
+            "default": "/dev/ttyUSB0",
+            "description": "Serial port path for RS232 communication (e.g., /dev/ttyUSB0, COM3)"
+          },
+          "zxBasic.rs232.baudRate": {
+            "type": "number",
+            "enum": [1200, 2400, 4800, 9600, 19200],
+            "default": 9600,
+            "description": "Baud rate for RS232 communication with ZX Spectrum Interface 1"
+          },
+          "zxBasic.rs232.mode": {
+            "type": "string",
+            "enum": ["binary", "text"],
+            "default": "binary",
+            "enumDescriptions": [
+              "8-bit binary mode (FORMAT \"b\") - for program transfers",
+              "7-bit text mode with RTS/CTS handshaking (FORMAT \"p\") - for text/printer output"
+            ],
+            "description": "RS232 communication mode for Interface 1"
+          },
+          "zxBasic.rs232.timeout": {
+            "type": "number",
+            "default": 30000,
+            "minimum": 1000,
+            "maximum": 120000,
+            "description": "Timeout in milliseconds for RS232 operations (default: 30 seconds)"
+          },
+          "zxBasic.rs232.handshaking": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable hardware RTS/CTS handshaking for reliable transfers"
           }
         }
       }
