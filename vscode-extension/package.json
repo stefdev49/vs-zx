@@ -2,7 +2,7 @@
   "name": "zx-basic-vscode-extension",
   "repository": "git+https://github.com/stef/vs-zx.git",
   "displayName": "ZX BASIC Development Environment",
-  "version": "1.0.168",
+  "version": "1.0.170",
   "description": "VS Code extension for ZX Spectrum BASIC development with Interface 1 transfer",
   "license": "MIT",
   "icon": "icon.png",
@@ -216,41 +216,51 @@
       ],
       "editor/context": [
         {
+          "command": "zx-basic.transfer",
+          "when": "editorLangId == zx-basic",
+          "group": "1_rs232"
+        },
+        {
+          "command": "zx-basic.receiveFromZx",
+          "when": "editorLangId == zx-basic",
+          "group": "1_rs232"
+        },
+        {
           "command": "zx-basic.playToZx",
           "when": "editorLangId == zx-basic",
-          "group": "1_modification"
+          "group": "2_audio"
         },
         {
           "command": "zx-basic.recordFromZx",
           "when": "editorLangId == zx-basic",
-          "group": "1_modification"
+          "group": "2_audio"
         },
         {
           "command": "zx-basic.loadFromMdr",
           "when": "editorLangId == zx-basic",
-          "group": "1_modification"
+          "group": "3_mdr"
         },
         {
           "command": "zx-basic.saveToMdr",
           "when": "editorLangId == zx-basic",
-          "group": "1_modification"
+          "group": "3_mdr"
         },
         {
           "command": "zx-basic.extractVariable",
           "when": "editorLangId == zx-basic",
-          "group": "2_refactoring",
+          "group": "4_refactoring",
           "submenu": "Refactor..."
         },
         {
           "command": "zx-basic.renumberLines",
           "when": "editorLangId == zx-basic",
-          "group": "2_refactoring",
+          "group": "4_refactoring",
           "submenu": "Refactor..."
         },
         {
           "command": "zx-basic.extractSubroutine",
           "when": "editorLangId == zx-basic && editorHasSelection",
-          "group": "2_refactoring",
+          "group": "4_refactoring",
           "submenu": "Refactor..."
         }
       ]
@@ -340,13 +350,22 @@
           },
           "zxBasic.rs232.baudRate": {
             "type": "number",
-            "enum": [1200, 2400, 4800, 9600, 19200],
+            "enum": [
+              1200,
+              2400,
+              4800,
+              9600,
+              19200
+            ],
             "default": 9600,
             "description": "Baud rate for RS232 communication with ZX Spectrum Interface 1"
           },
           "zxBasic.rs232.mode": {
             "type": "string",
-            "enum": ["binary", "text"],
+            "enum": [
+              "binary",
+              "text"
+            ],
             "default": "binary",
             "enumDescriptions": [
               "8-bit binary mode (FORMAT \"b\") - for program transfers",

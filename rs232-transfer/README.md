@@ -52,6 +52,28 @@ FORMAT "b";9600
 FORMAT "p";9600
 ```
 
+## Access in VS Code
+
+There are multiple ways to access RS232 transfer commands:
+
+### Command Palette
+
+Press **Ctrl+Shift+P** (or **F1**) and type:
+- **ZX BASIC: Send via RS232** - send current file to ZX Spectrum
+- **ZX BASIC: Receive via RS232** - receive program from ZX Spectrum
+- **ZX BASIC: Test RS232 Connection** - test serial connection
+- **ZX BASIC: List Serial Ports** - show available ports
+
+### Right-Click Context Menu
+
+With a `.bas` file open, right-click in the editor to see:
+- **Send via RS232** - send program to ZX Spectrum
+- **Receive via RS232** - receive program from ZX Spectrum
+
+### Editor Title Bar
+
+The upload icon (↑) in the editor title bar sends the current file via RS232.
+
 ## Usage
 
 ### Sending a Program to ZX Spectrum
