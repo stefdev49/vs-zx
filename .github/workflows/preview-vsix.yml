@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - develop
+      - master
   workflow_dispatch:
 
 jobs:
@@ -33,22 +34,26 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-
 
-      - name: Install dependencies (root)
+      - name: Install dependencies
         run: npm ci
 
-      - name: Build workspace
-        run: npm run build --if-present
+      - name: Build all workspaces
+        run: npm run build:tsc
+
+      - name: Bundle lsp-server
+        run: cd lsp-server && npm run bundle || true
 
       - name: Package VS Code extension
         run: |
           npm run clean:vsix || true
           cd vscode-extension
-          npm ci
           # bump internal version used in package.json without creating a git tag
           npm version prerelease --preid=preview --no-git-tag-version || true
-          npm run build --if-present || true
-          # create VSIX package
-          npx vsce package --no-dependencies
+          # bundle and copy files
+          npm run bundle
+          node ./scripts/copy-built.js
+          # create VSIX package (skip prepublish since we already built)
+          npx vsce package --no-dependencies --no-update-package-json
 
       - name: Find generated VSIX
         id: vsix

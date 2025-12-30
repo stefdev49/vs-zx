@@ -182,6 +182,23 @@ Move selected code to a GOSUB subroutine:
 - Only pure BASIC programs are supported (no machine code)
 - Network transfer via ZX Interface 1 is planned but not yet available
 
+## Bug Reports
+
+Found a bug? Please [open an issue](https://github.com/stefdev49/vs-zx/issues) with:
+
+1. **A minimal BASIC program** that reproduces the issue
+2. **Steps to reproduce** the problem
+3. **Expected vs actual behavior**
+
+Example bug report:
+
+```basic
+10 LET A$ = "test"
+20 PRINT A$
+```
+
+> When I run "Format Document", the string variable loses its `$` suffix.
+
 ## License
 
 MIT License
