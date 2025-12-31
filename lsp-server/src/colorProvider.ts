@@ -14,7 +14,6 @@ import { isDrawingAttribute } from './color-utils';
  * Colors 0-7 are standard colors, 8-15 are bright versions
  */
 const ZX_COLORS: { [key: number]: { r: number; g: number; b: number; name: string } } = {
-  // Normal colors
   0: { r: 0, g: 0, b: 0, name: 'Black' },
   1: { r: 0, g: 0, b: 0.803, name: 'Blue' },
   2: { r: 0.803, g: 0, b: 0, name: 'Red' },
@@ -23,27 +22,12 @@ const ZX_COLORS: { [key: number]: { r: number; g: number; b: number; name: strin
   5: { r: 0, g: 0.803, b: 0.803, name: 'Cyan' },
   6: { r: 0.803, g: 0.803, b: 0, name: 'Yellow' },
   7: { r: 0.803, g: 0.803, b: 0.803, name: 'White' },
-  // Bright colors (when BRIGHT 1 is set)
-  8: { r: 0, g: 0, b: 0, name: 'Bright Black' },
-  9: { r: 0, g: 0, b: 1, name: 'Bright Blue' },
-  10: { r: 1, g: 0, b: 0, name: 'Bright Red' },
-  11: { r: 1, g: 0, b: 1, name: 'Bright Magenta' },
-  12: { r: 0, g: 1, b: 0, name: 'Bright Green' },
-  13: { r: 0, g: 1, b: 1, name: 'Bright Cyan' },
-  14: { r: 1, g: 1, b: 0, name: 'Bright Yellow' },
-  15: { r: 1, g: 1, b: 1, name: 'Bright White' },
 };
 
 /**
  * Color commands that take a color value as argument
  */
 const COLOR_KEYWORDS = new Set(['INK', 'PAPER', 'BORDER']);
-
-/**
- * Special color values for INK and PAPER (not actual colors)
- * 8 = transparent (keep previous), 9 = contrast
- */
-const SPECIAL_COLOR_VALUES = new Set([8, 9]);
 
 export interface ColorLocation {
   keyword: string;

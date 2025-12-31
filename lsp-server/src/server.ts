@@ -57,6 +57,10 @@ import {
   ColorPresentationParams,
   ColorInformation,
   ColorPresentation,
+  InlayHint,
+  InlayHintParams,
+  DocumentHighlight,
+  DocumentHighlightParams,
 } from "vscode-languageserver/node";
 
 import { TextDocument } from "vscode-languageserver-textdocument";
@@ -79,6 +83,8 @@ import {
 } from "./line-number-utils";
 import { findIdentifierReferenceRanges } from "./identifier-utils";
 import { getDocumentColors, getColorPresentations } from "./colorProvider";
+import { getInlayHints } from "./inlayHintProvider";
+import { getDocumentHighlights } from "./documentHighlightProvider";
 import {
   autoRenumberLines,
   formatLine,
@@ -315,6 +321,8 @@ connection.onInitialize((params: InitializeParams) => {
       foldingRangeProvider: true,
       callHierarchyProvider: true,
       colorProvider: true,
+      inlayHintProvider: true,
+      documentHighlightProvider: true,
     },
   };
 });
@@ -2661,7 +2669,33 @@ function analyzeVariableUsage(
     }
   }
 
-  // Find all occurrences of this variable
+  // First, check if the hovered identifier is a function name (after DEFFN or FN)
+  let isHoveringOnFunction = false;
+  const adjustedChar = position.character + (position.line > 0 ? 1 : 0);
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    if (
+      token.type === TokenType.IDENTIFIER &&
+      token.line === position.line &&
+      adjustedChar >= token.start &&
+      adjustedChar < token.end &&
+      token.value.replace(/[$%]$/, "").toUpperCase() === baseName
+    ) {
+      // Found the hovered token, check if preceded by DEFFN or FN
+      if (i > 0) {
+        const prevToken = tokens[i - 1];
+        if (prevToken.type === TokenType.KEYWORD) {
+          const prevKeyword = prevToken.value.toUpperCase();
+          if (prevKeyword === "DEFFN" || prevKeyword === "FN") {
+            isHoveringOnFunction = true;
+          }
+        }
+      }
+      break;
+    }
+  }
+
+  // Find all occurrences of this variable/function
   const occurrences: {
     line: number;
     basicLine: string;
@@ -2684,8 +2718,9 @@ function analyzeVariableUsage(
         // Check if this is a declaration
         let isDeclaration = false;
         let context = "";
+        let isFunctionReference = false;
 
-        // Check previous token to see if it's LET, DIM, INPUT, or READ
+        // Check previous token to see if it's LET, DIM, INPUT, READ, DEFFN, or FN
         if (i > 0) {
           const prevToken = tokens[i - 1];
           if (prevToken.type === TokenType.KEYWORD) {
@@ -2694,11 +2729,27 @@ function analyzeVariableUsage(
               isDeclaration = true;
               context = prevKeyword;
             }
+            // Handle DEF FN function definitions (lexer produces "DEFFN" as single token)
+            if (prevKeyword === "DEFFN") {
+              isDeclaration = true;
+              isFunctionReference = true;
+              context = "DEF FN";
+            }
+            // Handle FN keyword for function calls
+            if (prevKeyword === "FN") {
+              isFunctionReference = true;
+              context = "FN call";
+            }
           }
         }
 
+        // If we're hovering on a function name, only count function-related occurrences
+        if (isHoveringOnFunction && !isFunctionReference) {
+          continue; // Skip non-function occurrences
+        }
+
         // Special handling for INPUT LINE - check if there's an INPUT keyword earlier in the same statement
-        if (!isDeclaration && i > 1) {
+        if (!isDeclaration && !isFunctionReference && i > 1) {
           const prevToken = tokens[i - 1];
           if (
             prevToken.type === TokenType.KEYWORD &&
@@ -2729,7 +2780,7 @@ function analyzeVariableUsage(
         }
 
         // Check if it's a FOR loop variable
-        if (i > 0 && tokens[i - 1].type === TokenType.FOR) {
+        if (!isFunctionReference && i > 0 && tokens[i - 1].type === TokenType.FOR) {
           isDeclaration = true;
           context = "FOR";
         }
@@ -2762,14 +2813,21 @@ function analyzeVariableUsage(
   // Get document URI for creating links
   const docUri = document.uri;
 
+  // Check if this is a DEF FN function
+  const declOcc = occurrences.find((o) => o.isDeclaration);
+  const isDefFnFunction = declOcc?.context === "DEF FN";
+
   // Build hover information
   let hoverInfo = `**${variableName}**\n\n`;
 
   // Find declaration occurrence for linking
-  const declOcc = occurrences.find((o) => o.isDeclaration);
   if (hasDeclaration && declOcc) {
     const declFileLineNum = declOcc.line + 1;
-    hoverInfo += `✅ **Declared** on [line ${declarationBasicLine}](${docUri}#L${declFileLineNum})\n\n`;
+    if (isDefFnFunction) {
+      hoverInfo += `✅ **Defined** as function on [line ${declarationBasicLine}](${docUri}#L${declFileLineNum})\n\n`;
+    } else {
+      hoverInfo += `✅ **Declared** on [line ${declarationBasicLine}](${docUri}#L${declFileLineNum})\n\n`;
+    }
   } else {
     hoverInfo += `⚠️ **Potentially undefined** - no declaration found\n\n`;
   }
@@ -2786,8 +2844,10 @@ function analyzeVariableUsage(
     hoverInfo += `📋 **Used in ${occurrences.length} locations throughout the program**\n`;
   }
 
-  // Check variable type
-  if (variableName.endsWith("$")) {
+  // Check variable/function type
+  if (isDefFnFunction) {
+    hoverInfo += "\n🔧 **Type:** User-defined function (DEF FN)";
+  } else if (variableName.endsWith("$")) {
     hoverInfo += "\n🔤 **Type:** String variable";
   } else if (variableName.endsWith("%")) {
     hoverInfo += "\n🔤 **Type:** Integer variable";
@@ -4681,6 +4741,38 @@ connection.onDocumentColor(
 connection.onColorPresentation(
   (params: ColorPresentationParams): ColorPresentation[] => {
     return getColorPresentations(params.color, params.range);
+  },
+);
+
+// Inlay Hint Provider - shows inline hints for GOTO/GOSUB targets
+connection.languages.inlayHint.on(
+  (params: InlayHintParams): InlayHint[] => {
+    const document = documents.get(params.textDocument.uri);
+    if (!document) {
+      return [];
+    }
+
+    const text = document.getText();
+    const lexer = new ZXBasicLexer();
+    const tokens = lexer.tokenize(text);
+
+    return getInlayHints(tokens);
+  },
+);
+
+// Document Highlight Provider - highlights all occurrences of a symbol
+connection.onDocumentHighlight(
+  (params: DocumentHighlightParams): DocumentHighlight[] => {
+    const document = documents.get(params.textDocument.uri);
+    if (!document) {
+      return [];
+    }
+
+    const text = document.getText();
+    const lexer = new ZXBasicLexer();
+    const tokens = lexer.tokenize(text);
+
+    return getDocumentHighlights(tokens, params.position);
   },
 );
 

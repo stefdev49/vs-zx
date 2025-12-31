@@ -113,8 +113,9 @@ Legend: `[x]` = Done, `[ ]` = To Do, `[ ] (WIP)` = In Progress.
 
 - [x] Folding Ranges — Provided through `onFoldingRanges`.
 - [x] Call Hierarchy — Incoming/outgoing GOSUB calls supported.
-- [ ] Inlay Hints — Not yet implemented.
-- [ ] Document Color — Not yet implemented.
+- [x] Inlay Hints — Shows inline hints for GOTO/GOSUB targets (e.g., `GOSUB 1000` → "Calculate result").
+- [x] Document Color — Shows ZX Spectrum color swatches for INK, PAPER, BORDER statements.
+- [x] Document Highlights — Highlights all occurrences of a symbol (variables, line numbers, DEF FN functions) with read/write distinction.
 - [ ] Moniker/Indexing — Not yet implemented.
 
 ### Workspace & Infrastructure

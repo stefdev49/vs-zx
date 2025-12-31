@@ -382,12 +382,14 @@ export async function receiveProgram(
 
         // Check if we have all expected data
         if (headerReceived && totalBytes >= expectedLength) {
+          clearInterval(idleCheck);
           clearTimeout(timeoutId);
           resolve();
         }
       });
 
       port.on('error', (err: Error) => {
+        clearInterval(idleCheck);
         clearTimeout(timeoutId);
         reject(new Error(`Port error: ${err.message}`));
       });
