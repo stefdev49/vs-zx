@@ -21,6 +21,14 @@ import {
 import { Token, TokenType } from './zxbasic';
 
 /**
+ * Adjust token character position for the lexer's off-by-one on lines > 0.
+ * The lexer includes the newline character in positions for lines after the first.
+ */
+function adjustCharacter(line: number, character: number): number {
+  return line > 0 ? character - 1 : character;
+}
+
+/**
  * Keywords that indicate a write/assignment context for the next identifier
  */
 const WRITE_KEYWORDS = new Set(['LET', 'DIM', 'FOR', 'INPUT', 'READ', 'DEF']);
@@ -160,8 +168,8 @@ function getIdentifierHighlights(
 
     highlights.push({
       range: {
-        start: { line: token.line, character: token.start },
-        end: { line: token.line, character: token.end },
+        start: { line: token.line, character: adjustCharacter(token.line, token.start) },
+        end: { line: token.line, character: adjustCharacter(token.line, token.end) },
       },
       kind,
     });
@@ -186,8 +194,8 @@ function getLineNumberHighlights(
     if (token.type === TokenType.LINE_NUMBER && token.value === lineNumberValue) {
       highlights.push({
         range: {
-          start: { line: token.line, character: token.start },
-          end: { line: token.line, character: token.end },
+          start: { line: token.line, character: adjustCharacter(token.line, token.start) },
+          end: { line: token.line, character: adjustCharacter(token.line, token.end) },
         },
         kind: DocumentHighlightKind.Text,
       });
@@ -198,8 +206,8 @@ function getLineNumberHighlights(
       if (isLineNumberReference(tokens, i)) {
         highlights.push({
           range: {
-            start: { line: token.line, character: token.start },
-            end: { line: token.line, character: token.end },
+            start: { line: token.line, character: adjustCharacter(token.line, token.start) },
+            end: { line: token.line, character: adjustCharacter(token.line, token.end) },
           },
           kind: DocumentHighlightKind.Text,
         });
@@ -232,8 +240,8 @@ function getDefFnHighlights(
       if (nameToken && nameToken.token.value.toUpperCase() === normalizedName) {
         highlights.push({
           range: {
-            start: { line: nameToken.token.line, character: nameToken.token.start },
-            end: { line: nameToken.token.line, character: nameToken.token.end },
+            start: { line: nameToken.token.line, character: adjustCharacter(nameToken.token.line, nameToken.token.start) },
+            end: { line: nameToken.token.line, character: adjustCharacter(nameToken.token.line, nameToken.token.end) },
           },
           kind: DocumentHighlightKind.Write,
         });
@@ -246,8 +254,8 @@ function getDefFnHighlights(
       if (nameToken && nameToken.token.value.toUpperCase() === normalizedName) {
         highlights.push({
           range: {
-            start: { line: nameToken.token.line, character: nameToken.token.start },
-            end: { line: nameToken.token.line, character: nameToken.token.end },
+            start: { line: nameToken.token.line, character: adjustCharacter(nameToken.token.line, nameToken.token.start) },
+            end: { line: nameToken.token.line, character: adjustCharacter(nameToken.token.line, nameToken.token.end) },
           },
           kind: DocumentHighlightKind.Read,
         });
