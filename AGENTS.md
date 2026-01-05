@@ -57,3 +57,63 @@
 - State captures saved to `test-screenshots/` directory
 - no feature or fix can be considered done if some tests are failing
 - all failing tests must be fixed
+
+## Tokenization and Detokenization Process
+
+### ZX Spectrum BASIC Token Format
+
+ZX Spectrum BASIC uses a tokenized format where keywords are represented by single bytes:
+
+- Tokens 0xA3-0xFF: ZX Spectrum BASIC keywords (REM, SAVE, LOAD, etc.)
+- Bytes 0x20-0x7E: Regular ASCII characters
+- Byte 0x0D: End of line marker
+- Other bytes: Non-printable characters
+
+### Tokenization (BASIC to TAP/TZX)
+
+When saving BASIC programs to tape formats:
+
+1. Keywords are converted to their corresponding token bytes using `TOKEN_MAP`
+2. Regular text remains as ASCII
+3. Line structure is preserved with line numbers and lengths
+4. Checksums are calculated for data integrity
+
+### Detokenization (TAP/TZX to BASIC)
+
+When loading BASIC programs from tape formats:
+
+1. Parse TAP/TZX blocks to extract program data
+2. Use `TOKEN_MAP` to convert token bytes back to keywords
+3. Preserve ASCII characters as-is
+4. Handle end-of-line markers properly
+5. Reconstruct the original BASIC source code structure
+
+### Record from ZX Feature
+
+The `recordFromZx` command follows this process:
+
+1. Records audio from ZX Spectrum tape output
+2. Converts WAV to TZX using external tools
+3. Extracts TAP data from TZX
+4. Uses `convertTapToBasicSource()` with proper token handling, number decoding, and spacing
+5. Saves as readable BASIC source code
+
+**Key Fixes Implemented (2026-01-05):**
+
+- ✅ **Line Number Decoding**: Fixed ZX Spectrum line number format (divide by 256)
+- ✅ **Token Conversion**: Integrated TOKEN_MAP for proper keyword conversion
+- ✅ **Number Decoding**: Implemented ZX Spectrum 5-byte float format decoding
+- ✅ **Intelligent Spacing**: Added context-aware spacing after tokens and before numbers
+- ✅ **Multi-word Commands**: Proper handling of "PRINT AT", "GO TO", etc.
+- ✅ **Clean Line Endings**: Removed extra blank lines in output
+
+### Key Components
+
+- `TOKEN_MAP` in `converter/src/core/token-map.ts`: Maps token bytes to keywords
+- `convertTapToBasicSource()` in `recordFromZx.ts`: Converts tokenized TAP data to BASIC source with:
+  - Line number decoding (divide by 256)
+  - Token-to-keyword conversion using TOKEN_MAP
+  - ZX Spectrum number decoding (5-byte float format)
+  - Intelligent spacing logic
+  - Proper TAP block parsing
+- `convertBasicSource()` in `converter.ts`: Converts BASIC source to tokenized format

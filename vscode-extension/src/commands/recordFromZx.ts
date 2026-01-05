@@ -7,12 +7,13 @@ import {
   StatusBarItem,
   OutputChannel,
   Uri,
-} from 'vscode';
-import * as child_process from 'child_process';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as converter from 'converter';
+} from "vscode";
+import * as child_process from "child_process";
+import * as path from "path";
+import * as fs from "fs";
+import * as os from "os";
+import * as converter from "converter";
+import { TOKEN_MAP } from "converter/out/core/token-map";
 
 let activeRecordingProcess: child_process.ChildProcess | null = null;
 let recordingStatusBar: StatusBarItem | null = null;
@@ -22,20 +23,20 @@ let tempTzxFile: string | null = null;
 
 export function register(
   context: ExtensionContext,
-): ExtensionContext['subscriptions'][0] {
+): ExtensionContext["subscriptions"][0] {
   // Create output channel for recording progress
-  recordingOutputChannel = window.createOutputChannel('ZX Spectrum Recording');
+  recordingOutputChannel = window.createOutputChannel("ZX Spectrum Recording");
   context.subscriptions.push(recordingOutputChannel);
 
   // Create status bar item
   recordingStatusBar = window.createStatusBarItem(StatusBarAlignment.Left, 101);
-  recordingStatusBar.command = 'zx-basic.stopZxRecording';
-  recordingStatusBar.tooltip = 'Click to stop recording';
+  recordingStatusBar.command = "zx-basic.stopZxRecording";
+  recordingStatusBar.tooltip = "Click to stop recording";
   context.subscriptions.push(recordingStatusBar);
 
   // Register record command
   const recordDisposable = commands.registerCommand(
-    'zx-basic.recordFromZx',
+    "zx-basic.recordFromZx",
     async () => {
       await recordFromZx();
     },
@@ -43,7 +44,7 @@ export function register(
 
   // Register stop command
   const stopDisposable = commands.registerCommand(
-    'zx-basic.stopZxRecording',
+    "zx-basic.stopZxRecording",
     async () => {
       await stopZxRecording();
     },
@@ -58,12 +59,12 @@ async function recordFromZx() {
   // Prevent multiple simultaneous recordings
   if (activeRecordingProcess) {
     const choice = await window.showWarningMessage(
-      'A recording is already in progress. Stop it first?',
-      'Stop and Record New',
-      'Cancel',
+      "A recording is already in progress. Stop it first?",
+      "Stop and Record New",
+      "Cancel",
     );
 
-    if (choice === 'Stop and Record New') {
+    if (choice === "Stop and Record New") {
       await stopZxRecording();
     } else {
       return;
@@ -71,26 +72,26 @@ async function recordFromZx() {
   }
 
   // Get configuration
-  const config = workspace.getConfiguration('zxBasic.recordFromZx');
-  const tzxwavPath = config.get<string>('tzxwavPath', 'tzxwav');
-  const recordingDuration = config.get<number>('recordingDuration', 0); // 0 = manual stop
+  const config = workspace.getConfiguration("zxBasic.recordFromZx");
+  const tzxwavPath = config.get<string>("tzxwavPath", "tzxwav");
+  const recordingDuration = config.get<number>("recordingDuration", 0); // 0 = manual stop
   const outputDirectory = config.get<string>(
-    'outputDirectory',
-    '${workspaceFolder}/recordings',
+    "outputDirectory",
+    "${workspaceFolder}/recordings",
   );
 
   // Resolve output directory
   let resolvedOutputDir = outputDirectory;
   if (
-    outputDirectory.includes('${workspaceFolder}') &&
+    outputDirectory.includes("${workspaceFolder}") &&
     workspace.workspaceFolders?.length
   ) {
     resolvedOutputDir = outputDirectory.replace(
-      '${workspaceFolder}',
+      "${workspaceFolder}",
       workspace.workspaceFolders[0].uri.fsPath,
     );
   } else {
-    resolvedOutputDir = path.join(os.homedir(), 'zx-recordings');
+    resolvedOutputDir = path.join(os.homedir(), "zx-recordings");
   }
 
   // Create output directory if it doesn't exist
@@ -106,29 +107,29 @@ async function recordFromZx() {
   }
 
   // Create temporary files
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   tempWavFile = path.join(os.tmpdir(), `zx-recording-${timestamp}.wav`);
   tempTzxFile = path.join(os.tmpdir(), `zx-recording-${timestamp}.tzx`);
 
   try {
     // Show progress
-    window.showInformationMessage('Starting ZX Spectrum recording...');
+    window.showInformationMessage("Starting ZX Spectrum recording...");
 
     // Prepare output channel
     if (!recordingOutputChannel) {
       recordingOutputChannel = window.createOutputChannel(
-        'ZX Spectrum Recording',
+        "ZX Spectrum Recording",
       );
     }
     recordingOutputChannel.clear();
-    recordingOutputChannel.appendLine('Starting ZX Spectrum recording...');
+    recordingOutputChannel.appendLine("Starting ZX Spectrum recording...");
     recordingOutputChannel.appendLine(`Temporary WAV file: ${tempWavFile}`);
     recordingOutputChannel.appendLine(`Output directory: ${resolvedOutputDir}`);
     recordingOutputChannel.show(true);
 
     // Update status bar
     if (recordingStatusBar) {
-      recordingStatusBar.text = '$(mic) Recording from ZX...';
+      recordingStatusBar.text = "$(mic) Recording from ZX...";
       recordingStatusBar.show();
     }
 
@@ -137,66 +138,66 @@ async function recordFromZx() {
     let recordCommand: string;
     let recordArgs: string[];
 
-    if (process.platform === 'linux') {
-      recordCommand = 'arecord';
+    if (process.platform === "linux") {
+      recordCommand = "arecord";
       recordArgs = [
-        '-f',
-        'cd', // CD quality: 16-bit, 44100 Hz, stereo
-        '-c',
-        '2', // Stereo
-        '-t',
-        'wav', // WAV format
+        "-f",
+        "cd", // CD quality: 16-bit, 44100 Hz, stereo
+        "-c",
+        "2", // Stereo
+        "-t",
+        "wav", // WAV format
         tempWavFile,
       ];
 
       if (recordingDuration > 0) {
-        recordArgs.unshift('-d', recordingDuration.toString());
+        recordArgs.unshift("-d", recordingDuration.toString());
       }
-    } else if (process.platform === 'darwin') {
-      recordCommand = 'rec';
+    } else if (process.platform === "darwin") {
+      recordCommand = "rec";
       recordArgs = [
-        '-r',
-        '44100', // Sample rate
-        '-c',
-        '2', // Channels
-        '-b',
-        '16', // Bit depth
-        '-e',
-        'signed', // Encoding
+        "-r",
+        "44100", // Sample rate
+        "-c",
+        "2", // Channels
+        "-b",
+        "16", // Bit depth
+        "-e",
+        "signed", // Encoding
         tempWavFile,
       ];
 
       if (recordingDuration > 0) {
-        recordArgs.unshift('-l', recordingDuration.toString());
+        recordArgs.unshift("-l", recordingDuration.toString());
       }
-    } else if (process.platform === 'win32') {
-      recordCommand = 'ffmpeg';
+    } else if (process.platform === "win32") {
+      recordCommand = "ffmpeg";
       recordArgs = [
-        '-f',
-        'dshow',
-        '-i',
-        'audio=Microphone',
-        '-t',
-        recordingDuration > 0 ? recordingDuration.toString() : '300', // 5 minutes default
-        '-acodec',
-        'pcm_s16le',
-        '-ar',
-        '44100',
-        '-ac',
-        '2',
+        "-f",
+        "dshow",
+        "-i",
+        "audio=Microphone",
+        "-t",
+        recordingDuration > 0 ? recordingDuration.toString() : "300", // 5 minutes default
+        "-acodec",
+        "pcm_s16le",
+        "-ar",
+        "44100",
+        "-ac",
+        "2",
         tempWavFile,
       ];
     } else {
-      throw new Error('Audio recording not supported on this platform');
+      throw new Error("Audio recording not supported on this platform");
     }
 
     // Check if recording command is available
     try {
       await new Promise<void>((resolve, reject) => {
-        const checkProcess = child_process.spawn(recordCommand, ['--help']);
+        const checkProcess = child_process.spawn(recordCommand, ["--help"]);
         let hasError = false;
 
-        checkProcess.on('error', () => {
+        checkProcess.on("error", () => {
           hasError = true;
           reject(
             new Error(
@@ -205,7 +206,7 @@ async function recordFromZx() {
           );
         });
 
-        checkProcess.on('exit', (code) => {
+        checkProcess.on("exit", (code) => {
           if (!hasError && code !== 0) {
             reject(
               new Error(
@@ -242,45 +243,45 @@ async function recordFromZx() {
 
     // Start recording process
     activeRecordingProcess = child_process.spawn(recordCommand, recordArgs, {
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ["ignore", "pipe", "pipe"],
     });
 
     recordingOutputChannel?.appendLine(
-      `Started recording with: ${recordCommand} ${recordArgs.join(' ')}`,
+      `Started recording with: ${recordCommand} ${recordArgs.join(" ")}`,
     );
 
     // Handle stdout
-    activeRecordingProcess.stdout?.on('data', (data: Buffer) => {
+    activeRecordingProcess.stdout?.on("data", (data: Buffer) => {
       const output = data.toString();
       recordingOutputChannel?.append(output);
     });
 
     // Handle stderr
-    activeRecordingProcess.stderr?.on('data', (data: Buffer) => {
+    activeRecordingProcess.stderr?.on("data", (data: Buffer) => {
       const output = data.toString();
       recordingOutputChannel?.append(output);
     });
 
     // Handle process exit (auto-stop due to duration)
-    activeRecordingProcess.on('exit', async (code, signal) => {
-      if (signal === 'SIGTERM' || signal === 'SIGKILL') {
-        recordingOutputChannel?.appendLine('---');
-        recordingOutputChannel?.appendLine('Recording stopped by user');
+    activeRecordingProcess.on("exit", async (code, signal) => {
+      if (signal === "SIGTERM" || signal === "SIGKILL") {
+        recordingOutputChannel?.appendLine("---");
+        recordingOutputChannel?.appendLine("Recording stopped by user");
       } else if (code === 0) {
-        recordingOutputChannel?.appendLine('---');
-        recordingOutputChannel?.appendLine('Recording completed');
+        recordingOutputChannel?.appendLine("---");
+        recordingOutputChannel?.appendLine("Recording completed");
       } else {
         // For audio recording tools, non-zero exit codes can be normal when interrupted
         // Check if we have a WAV file - if so, treat it as success
         if (tempWavFile && fs.existsSync(tempWavFile)) {
           const wavStats = fs.statSync(tempWavFile);
           if (wavStats.size > 0) {
-            recordingOutputChannel?.appendLine('---');
+            recordingOutputChannel?.appendLine("---");
             recordingOutputChannel?.appendLine(
-              'Recording stopped (interrupted but data captured)',
+              "Recording stopped (interrupted but data captured)",
             );
           } else {
-            recordingOutputChannel?.appendLine('---');
+            recordingOutputChannel?.appendLine("---");
             recordingOutputChannel?.appendLine(
               `Recording failed with code ${code}`,
             );
@@ -295,7 +296,7 @@ async function recordFromZx() {
             return;
           }
         } else {
-          recordingOutputChannel?.appendLine('---');
+          recordingOutputChannel?.appendLine("---");
           recordingOutputChannel?.appendLine(
             `Recording failed with code ${code}`,
           );
@@ -322,8 +323,8 @@ async function recordFromZx() {
     });
 
     // Handle process errors
-    activeRecordingProcess.on('error', (err) => {
-      recordingOutputChannel?.appendLine('---');
+    activeRecordingProcess.on("error", (err) => {
+      recordingOutputChannel?.appendLine("---");
       recordingOutputChannel?.appendLine(`Error: ${err.message}`);
       window.showErrorMessage(`Recording error: ${err.message}`);
 
@@ -338,13 +339,13 @@ async function recordFromZx() {
     });
 
     window.showInformationMessage(
-      'Recording started. Click the microphone icon in status bar to stop.',
+      "Recording started. Click the microphone icon in status bar to stop.",
     );
   } catch (error) {
     const err = error as Error;
     window.showErrorMessage(`Failed to start recording: ${err.message}`);
     recordingOutputChannel?.appendLine(`Error: ${err.message}`);
-    console.error('Record from ZX error:', err);
+    console.error("Record from ZX error:", err);
 
     // Clean up
     if (recordingStatusBar) {
@@ -359,20 +360,20 @@ async function recordFromZx() {
 
 async function processRecording(tzxwavPath: string, outputDirectory: string) {
   if (!tempWavFile || !tempTzxFile) {
-    window.showErrorMessage('No temporary files available for processing');
+    window.showErrorMessage("No temporary files available for processing");
     return;
   }
 
   try {
     // Check if WAV file was created and has content
     if (!fs.existsSync(tempWavFile)) {
-      window.showErrorMessage('Recording failed: No WAV file created');
+      window.showErrorMessage("Recording failed: No WAV file created");
       return;
     }
 
     const wavStats = fs.statSync(tempWavFile);
     if (wavStats.size === 0) {
-      window.showErrorMessage('Recording failed: WAV file is empty');
+      window.showErrorMessage("Recording failed: WAV file is empty");
       return;
     }
 
@@ -381,36 +382,36 @@ async function processRecording(tzxwavPath: string, outputDirectory: string) {
     );
 
     // Convert WAV to TZX using tzxwav
-    recordingOutputChannel?.appendLine('Converting WAV to TZX using tzxwav...');
+    recordingOutputChannel?.appendLine("Converting WAV to TZX using tzxwav...");
 
     const tzxwavProcess = child_process.spawn(
       tzxwavPath,
       [
-        '-o',
+        "-o",
         tempTzxFile,
-        '-v', // Verbose output
+        "-v", // Verbose output
         tempWavFile,
       ],
       {
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: ["ignore", "pipe", "pipe"],
       },
     );
 
-    let tzxwavError = '';
+    let tzxwavError = "";
 
-    tzxwavProcess.stdout?.on('data', (data: Buffer) => {
+    tzxwavProcess.stdout?.on("data", (data: Buffer) => {
       const output = data.toString();
       recordingOutputChannel?.append(output);
     });
 
-    tzxwavProcess.stderr?.on('data', (data: Buffer) => {
+    tzxwavProcess.stderr?.on("data", (data: Buffer) => {
       const output = data.toString();
       tzxwavError += output;
       recordingOutputChannel?.append(output);
     });
 
     await new Promise<void>((resolve, reject) => {
-      tzxwavProcess.on('exit', (code) => {
+      tzxwavProcess.on("exit", (code) => {
         if (code === 0) {
           resolve();
         } else {
@@ -420,19 +421,19 @@ async function processRecording(tzxwavPath: string, outputDirectory: string) {
         }
       });
 
-      tzxwavProcess.on('error', (err) => {
+      tzxwavProcess.on("error", (err) => {
         reject(new Error(`tzxwav error: ${err.message}`));
       });
     });
 
     // Check if TZX file was created
     if (!fs.existsSync(tempTzxFile)) {
-      throw new Error('TZX conversion failed: No TZX file created');
+      throw new Error("TZX conversion failed: No TZX file created");
     }
 
     const tzxStats = fs.statSync(tempTzxFile);
     if (tzxStats.size === 0) {
-      throw new Error('TZX conversion failed: TZX file is empty');
+      throw new Error("TZX conversion failed: TZX file is empty");
     }
 
     recordingOutputChannel?.appendLine(
@@ -442,20 +443,20 @@ async function processRecording(tzxwavPath: string, outputDirectory: string) {
     // Check if TZX file is suspiciously small (likely no valid tape data found)
     if (tzxStats.size < 100) {
       recordingOutputChannel?.appendLine(
-        '⚠️  TZX file is very small - no valid ZX Spectrum tape data detected',
+        "⚠️  TZX file is very small - no valid ZX Spectrum tape data detected",
       );
-      recordingOutputChannel?.appendLine('💡 Tips for successful recording:');
+      recordingOutputChannel?.appendLine("💡 Tips for successful recording:");
       recordingOutputChannel?.appendLine(
-        '   1. Make sure you have proper audio connection from ZX Spectrum tape output',
-      );
-      recordingOutputChannel?.appendLine(
-        '   2. Start recording BEFORE starting tape output on ZX Spectrum',
+        "   1. Make sure you have proper audio connection from ZX Spectrum tape output",
       );
       recordingOutputChannel?.appendLine(
-        '   3. Use proper volume levels - tape signals should be clear',
+        "   2. Start recording BEFORE starting tape output on ZX Spectrum",
       );
       recordingOutputChannel?.appendLine(
-        '   4. Try adjusting tzxwav sensitivity settings if needed',
+        "   3. Use proper volume levels - tape signals should be clear",
+      );
+      recordingOutputChannel?.appendLine(
+        "   4. Try adjusting tzxwav sensitivity settings if needed",
       );
     }
 
@@ -464,7 +465,7 @@ async function processRecording(tzxwavPath: string, outputDirectory: string) {
   } catch (error) {
     const err = error as Error;
     recordingOutputChannel?.appendLine(`Error: ${err.message}`);
-    console.error('Recording processing error:', err);
+    console.error("Recording processing error:", err);
 
     // Keep WAV file for diagnosis when conversion fails
     if (tempWavFile && fs.existsSync(tempWavFile)) {
@@ -472,7 +473,7 @@ async function processRecording(tzxwavPath: string, outputDirectory: string) {
         `⚠️  WAV file preserved for diagnosis: ${tempWavFile}`,
       );
       recordingOutputChannel?.appendLine(
-        '💡 You can manually convert this file using: tzxwav -o output.tzx ' +
+        "💡 You can manually convert this file using: tzxwav -o output.tzx " +
           tempWavFile,
       );
       // Only clean up TZX file, keep WAV file
@@ -483,7 +484,7 @@ async function processRecording(tzxwavPath: string, outputDirectory: string) {
             `Cleaned up temporary TZX file: ${tempTzxFile}`,
           );
         } catch (cleanupError) {
-          console.warn('Failed to clean up TZX file:', cleanupError);
+          console.warn("Failed to clean up TZX file:", cleanupError);
         }
       }
 
@@ -500,7 +501,7 @@ async function processRecording(tzxwavPath: string, outputDirectory: string) {
 async function convertTzxToBasic(tzxFile: string, outputDirectory: string) {
   try {
     recordingOutputChannel?.appendLine(
-      'Parsing TZX file to extract BASIC program...',
+      "Parsing TZX file to extract BASIC program...",
     );
 
     // Read TZX file
@@ -510,7 +511,7 @@ async function convertTzxToBasic(tzxFile: string, outputDirectory: string) {
     const tapBuffer = converter.convertTzxToTap(tzxBuffer);
 
     if (!tapBuffer || tapBuffer.length === 0) {
-      throw new Error('Failed to convert TZX to TAP format');
+      throw new Error("Failed to convert TZX to TAP format");
     }
 
     recordingOutputChannel?.appendLine(
@@ -520,16 +521,16 @@ async function convertTzxToBasic(tzxFile: string, outputDirectory: string) {
     // Parse TAP file to extract program name from header
     const tapMetadata = converter.getTapMetadata(tapBuffer);
 
-    let programName = 'recorded-program';
+    let programName = "recorded-program";
     if (tapMetadata) {
-      programName = tapMetadata.programName || 'recorded-program';
+      programName = tapMetadata.programName || "recorded-program";
       // Clean up program name for filename
       programName = programName
-        .replace(/[^a-zA-Z0-9\-_.]/g, '_')
+        .replace(/[^a-zA-Z0-9\-_.]/g, "_")
         .substring(0, 20)
         .trim();
-      if (programName === '') {
-        programName = 'recorded-program';
+      if (programName === "") {
+        programName = "recorded-program";
       }
     }
 
@@ -542,12 +543,12 @@ async function convertTzxToBasic(tzxFile: string, outputDirectory: string) {
     // For now, we'll create a simple conversion by parsing the TAP data
     const basicSource = convertTapToBasicSource(tapBuffer);
 
-    if (!basicSource || basicSource.trim() === '') {
-      throw new Error('Extracted BASIC source is empty');
+    if (!basicSource || basicSource.trim() === "") {
+      throw new Error("Extracted BASIC source is empty");
     }
 
     // Create output file name
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const outputFileName = `${programName}-${timestamp}.bas`;
     const outputFilePath = path.join(outputDirectory, outputFileName);
 
@@ -558,38 +559,75 @@ async function convertTzxToBasic(tzxFile: string, outputDirectory: string) {
       `BASIC program saved to: ${outputFilePath}`,
     );
     recordingOutputChannel?.appendLine(
-      `Program has ${basicSource.split('\n').length} lines`,
+      `Program has ${basicSource.split("\n").length} lines`,
     );
 
     // Show success message with option to open file
     const choice = await window.showInformationMessage(
       `Successfully recorded program "${programName}" from ZX Spectrum!`,
-      'Open File',
-      'Show in Explorer',
+      "Open File",
+      "Show in Explorer",
     );
 
-    if (choice === 'Open File') {
+    if (choice === "Open File") {
       const document = await workspace.openTextDocument(outputFilePath);
       await window.showTextDocument(document);
-    } else if (choice === 'Show in Explorer') {
+    } else if (choice === "Show in Explorer") {
       const fileUri = Uri.file(outputFilePath);
-      await commands.executeCommand('revealFileInOS', fileUri);
+      await commands.executeCommand("revealFileInOS", fileUri);
     }
   } catch (error) {
     const err = error as Error;
     window.showErrorMessage(`Failed to convert TZX to BASIC: ${err.message}`);
     recordingOutputChannel?.appendLine(`Conversion error: ${err.message}`);
-    console.error('TZX to BASIC conversion error:', err);
+    console.error("TZX to BASIC conversion error:", err);
     throw err;
   }
 }
 
 function convertTapToBasicSource(tapBuffer: Buffer): string {
-  // Simple TAP to BASIC conversion
-  // This is a basic implementation - for production use, we should use the proper tokenizer
-
-  let result = '';
+  // TAP to BASIC conversion with proper token and number handling
+  let result = "";
   let i = 0;
+
+  // Helper function to decode ZX Spectrum 5-byte float format
+  function decodeZxFloat(bytes: number[]): number {
+    if (bytes.length !== 5) {
+      return 0;
+    }
+
+    // Check if it's a small integer format
+    if (bytes[0] === 0x00 && bytes[4] === 0x00) {
+      // Small integer format: 00 sign lo hi 00
+      const sign = bytes[1];
+      const lo = bytes[2];
+      const hi = bytes[3];
+
+      let value = lo | (hi << 8);
+
+      if (sign === 0xff) {
+        // Negative number
+        value = value - 65536;
+      }
+
+      return value;
+    }
+
+    // Full floating point format
+    const sign = bytes[1] & 0x80;
+    const exponent = bytes[0] - 0x81; // Remove bias
+    const mantissa =
+      ((bytes[1] & 0x7f) << 24) | (bytes[2] << 16) | (bytes[3] << 8) | bytes[4];
+
+    // Convert to JavaScript number
+    let value = (mantissa / 0x80000000 + 1.0) * Math.pow(2, exponent);
+
+    if (sign) {
+      value = -value;
+    }
+
+    return value;
+  }
 
   // Parse TAP blocks
   while (i < tapBuffer.length) {
@@ -628,23 +666,88 @@ function convertTapToBasicSource(tapBuffer: Buffer): string {
         const lineContent = programData.slice(j, j + lineLength);
         j += lineLength;
 
-        // Convert to text (simple ASCII conversion for now)
-        result += lineNumber + ' ';
-        for (let k = 0; k < lineContent.length; k++) {
+        // ZX Spectrum stores line numbers as line_number * 256 for compression
+        const actualLineNumber = lineNumber / 256;
+
+        // Convert to text with token and number handling
+        result += actualLineNumber + " ";
+        let k = 0;
+        let needsSpace = false; // Track if we need to add a space before next token
+
+        while (k < lineContent.length) {
           const byte = lineContent[k];
+
           if (byte === 0x0d) {
             // End of line
-            result += '\n';
+            result += "\n";
             break;
+          } else if (byte === 0x0e && k + 5 < lineContent.length) {
+            // Number encoding: 0x0E + 5-byte float
+            const floatBytes = lineContent.slice(k + 1, k + 6);
+            const numberValue = decodeZxFloat(Array.from(floatBytes));
+
+            // Skip the ASCII digits that precede the 0x0E marker
+            // We need to backtrack to find where the number started
+            let numStart = k;
+            while (
+              numStart > 0 &&
+              lineContent[numStart - 1] >= 0x30 &&
+              lineContent[numStart - 1] <= 0x39
+            ) {
+              numStart--; // Backtrack through ASCII digits
+            }
+
+            // Replace the entire number sequence with the decoded value
+            if (numStart < k) {
+              result = result.substring(0, result.length - (k - numStart));
+            }
+
+            result += numberValue.toString();
+            k += 6; // Skip 0x0E + 5 bytes
+            needsSpace = true; // Numbers are usually followed by space
+          } else if (
+            byte >= 0xa3 &&
+            byte < TOKEN_MAP.length &&
+            TOKEN_MAP[byte]?.token
+          ) {
+            // Tokenized keyword
+            const token = TOKEN_MAP[byte]!.token;
+
+            // Add space before token if needed (but not at start of line)
+            if (
+              needsSpace &&
+              result.length > String(actualLineNumber).length + 1
+            ) {
+              result += " ";
+            }
+
+            result += token;
+            needsSpace = true; // Tokens are usually followed by space
+            k++;
+
+            // Add space after token if it's not at end of line and next char is not a token
+            if (
+              k < lineContent.length &&
+              lineContent[k] !== 0x0d &&
+              lineContent[k] !== 0x0e &&
+              lineContent[k] < 0xa3
+            ) {
+              result += " ";
+            }
           } else if (byte >= 32 && byte < 127) {
             // Printable ASCII
-            result += String.fromCharCode(byte);
+            const char = String.fromCharCode(byte);
+
+            // Only add space after tokens, not between regular characters
+            result += char;
+            needsSpace = false; // Regular characters don't need space after them
+            k++;
           } else {
             // Non-printable - show as hex
             result += `[${byte.toString(16)}]`;
+            k++;
           }
         }
-        result += '\n';
       }
     }
   }
@@ -654,23 +757,23 @@ function convertTapToBasicSource(tapBuffer: Buffer): string {
 
 async function stopZxRecording() {
   if (!activeRecordingProcess) {
-    window.showInformationMessage('No recording in progress');
+    window.showInformationMessage("No recording in progress");
     return;
   }
 
   try {
     // Try graceful termination first
-    activeRecordingProcess.kill('SIGTERM');
+    activeRecordingProcess.kill("SIGTERM");
 
     // If still running after 1 second, force kill
     setTimeout(() => {
       if (activeRecordingProcess && !activeRecordingProcess.killed) {
-        activeRecordingProcess.kill('SIGKILL');
+        activeRecordingProcess.kill("SIGKILL");
       }
     }, 1000);
 
-    window.showInformationMessage('Stopping recording...');
-    recordingOutputChannel?.appendLine('Stopping recording process...');
+    window.showInformationMessage("Stopping recording...");
+    recordingOutputChannel?.appendLine("Stopping recording process...");
   } catch (error) {
     const err = error as Error;
     window.showErrorMessage(`Failed to stop recording: ${err.message}`);
@@ -692,7 +795,7 @@ function cleanupTempFiles() {
       );
     }
   } catch (error) {
-    console.warn('Failed to clean up temporary files:', error);
+    console.warn("Failed to clean up temporary files:", error);
   } finally {
     tempWavFile = null;
     tempTzxFile = null;
@@ -703,7 +806,7 @@ export function deactivate() {
   // Clean up active recording on extension deactivate
   if (activeRecordingProcess) {
     try {
-      activeRecordingProcess.kill('SIGKILL');
+      activeRecordingProcess.kill("SIGKILL");
     } catch (error) {
       // Ignore errors during cleanup
     }
