@@ -8,11 +8,13 @@ A complete development environment for ZX Spectrum BASIC programming. Write, for
 ## Features
 
 ### 🎨 Syntax Highlighting & Formatting
+
 - Full syntax highlighting for ZX BASIC keywords, variables, and strings
 - Automatic code formatting with keyword uppercasing
 - Smart line number management and renumbering
 
 ### ✅ Real-time Diagnostics
+
 - Line number validation (1-9999)
 - Duplicate line detection
 - Missing line number warnings
@@ -22,6 +24,7 @@ A complete development environment for ZX Spectrum BASIC programming. Write, for
 - Array dimension checks
 
 ### 💡 Code Intelligence
+
 - **Auto-completion** for keywords, variables, and snippets
 - **Hover information** for commands and syntax help
 - **Go to Definition** for GOTO/GOSUB targets
@@ -32,21 +35,25 @@ A complete development environment for ZX Spectrum BASIC programming. Write, for
 - **Rename** variables and line numbers across your program
 
 ### 🔧 Refactoring Tools
+
 - **Extract Variable** - Select an expression to create a named variable
 - **Extract Subroutine** - Move code blocks to GOSUB subroutines
 - **Renumber Lines** - Automatically fix line numbering
 
 ### 📼 TZX Tape Format
+
 - **Save as TZX** - Convert programs to tape format for emulators
 - **Play to ZX Spectrum** - Stream audio directly to real hardware
 
 ### 💾 Microdrive Support
+
 - **Save to MDR** - Create Microdrive cartridge files
 - **Load from MDR** - Import programs from MDR format
 
 ### 🎵 Audio Transfer
+
 - **Play to ZX Spectrum** - Convert and play programs through audio output
-- **Record from ZX Spectrum** - Capture and convert programs from audio input
+- **Record from ZX Spectrum** - Capture and convert programs from audio input with proper token/number handling
 
 ## Getting Started
 
@@ -86,11 +93,11 @@ pip install tzxtools
 
 ### Settings
 
-| Setting | Description | Default |
-|---------|-------------|---------|
-| `zxBasic.tzxplay.path` | Path to tzxplay | `"tzxplay"` |
-| `zxBasic.tzxplay.mode48k` | ZX Spectrum 48K mode | `false` |
-| `zxBasic.tzxplay.sine` | Soft sine pulses | `false` |
+| Setting                   | Description          | Default     |
+| ------------------------- | -------------------- | ----------- |
+| `zxBasic.tzxplay.path`    | Path to tzxplay      | `"tzxplay"` |
+| `zxBasic.tzxplay.mode48k` | ZX Spectrum 48K mode | `false`     |
+| `zxBasic.tzxplay.sine`    | Soft sine pulses     | `false`     |
 
 ## Audio Recording
 
@@ -109,15 +116,19 @@ Capture programs from your ZX Spectrum:
 1. Connect ZX Spectrum tape output to your audio input
 2. On the Spectrum, type `SAVE "PROGRAM"` and press ENTER
 3. Run **ZX BASIC: Record from ZX Spectrum**
-4. The program will be captured and converted to `.bas`
+4. The program will be captured and converted to `.bas` with:
+   - Correct line numbers (divided by 256)
+   - Proper token-to-keyword conversion
+   - Accurate number decoding
+   - Intelligent spacing
 
 ### Settings
 
-| Setting | Description | Default |
-|---------|-------------|---------|
-| `zxBasic.recordFromZx.tzxwavPath` | Path to tzxwav | `"tzxwav"` |
-| `zxBasic.recordFromZx.recordingDuration` | Duration in seconds (0 = manual) | `0` |
-| `zxBasic.recordFromZx.outputDirectory` | Output folder | `"${workspaceFolder}/recordings"` |
+| Setting                                  | Description                      | Default                           |
+| ---------------------------------------- | -------------------------------- | --------------------------------- |
+| `zxBasic.recordFromZx.tzxwavPath`        | Path to tzxwav                   | `"tzxwav"`                        |
+| `zxBasic.recordFromZx.recordingDuration` | Duration in seconds (0 = manual) | `0`                               |
+| `zxBasic.recordFromZx.outputDirectory`   | Output folder                    | `"${workspaceFolder}/recordings"` |
 
 ## Refactoring
 
@@ -126,11 +137,13 @@ Capture programs from your ZX Spectrum:
 Select an expression and extract it to a variable:
 
 **Before:**
+
 ```basic
 10 PRINT 4*2+10
 ```
 
 **After:**
+
 ```basic
 10 LET RESULT = 4 * 2 + 10
 20 PRINT RESULT
@@ -141,6 +154,7 @@ Select an expression and extract it to a variable:
 Move selected code to a GOSUB subroutine:
 
 **Before:**
+
 ```basic
 10 LET X = 5
 20 LET Y = 10
@@ -150,6 +164,7 @@ Move selected code to a GOSUB subroutine:
 ```
 
 **After (select lines 30-40):**
+
 ```basic
 10 LET X = 5
 20 LET Y = 10
@@ -163,14 +178,14 @@ Move selected code to a GOSUB subroutine:
 
 ## Keyboard Shortcuts
 
-| Command | Description |
-|---------|-------------|
+| Command        | Description                                    |
+| -------------- | ---------------------------------------------- |
 | `Ctrl+Shift+P` | Command palette - search for ZX BASIC commands |
-| `F12` | Go to Definition |
-| `Shift+F12` | Find All References |
-| `F2` | Rename symbol |
-| `Ctrl+Space` | Trigger completion |
-| `Ctrl+Shift+O` | Document symbols |
+| `F12`          | Go to Definition                               |
+| `Shift+F12`    | Find All References                            |
+| `F2`           | Rename symbol                                  |
+| `Ctrl+Space`   | Trigger completion                             |
+| `Ctrl+Shift+O` | Document symbols                               |
 
 ## Requirements
 

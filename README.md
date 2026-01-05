@@ -57,7 +57,7 @@ Legend: `[x]` = Done, `[ ]` = To Do, `[ ] (WIP)` = In Progress.
 - [x] (WIP) **RS232** transfer utility
 - [x] **Save as TZX** - Convert BASIC programs to TZX tape format for use with emulators and tape preservation tools
 - [x] **Play to ZX Spectrum** - Convert and play BASIC programs directly through audio using tzxplay, no file writing needed
-- [x] **Record from ZX Spectrum** - Convert BASIC programs directly from ZX Spectrum audio using tzxwav and audio recording, no file writing needed
+- [x] **Record from ZX Spectrum** - Convert BASIC programs directly from ZX Spectrum audio using tzxwav and audio recording, with proper token/number handling and spacing
 - [x] **Advanced Refactoring** - Extract variables, extract subroutines, and other code transformations
 - [x] **Code Formatting** - Automatic line numbering, keyword uppercasing, and code cleanup
 - [x] **Save to mdr** - Convert BASIC programs to MDR format
@@ -318,7 +318,7 @@ npm run test:vscode-e2e
 **Test Coverage (22 tests):**
 
 - ✅ Extension loading and activation
-- ✅ Language recognition for .bas files  
+- ✅ Language recognition for .bas files
 - ✅ Syntax highlighting with semantic tokens
 - ✅ Document formatting command
 - ✅ Diagnostics for code errors
