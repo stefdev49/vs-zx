@@ -1,4 +1,4 @@
-import * as path from 'path';
+import * as path from "path";
 import {
   workspace,
   ExtensionContext,
@@ -11,25 +11,26 @@ import {
   FormattingOptions,
   CancellationToken,
   window,
-} from 'vscode';
+} from "vscode";
 
 import {
   LanguageClient,
   LanguageClientOptions,
   Middleware,
   TransportKind,
-} from 'vscode-languageclient/node';
+} from "vscode-languageclient/node";
 
 // Import command modules
-import * as transferCmd from './commands/transfer';
-import * as saveAsTzxCmd from './commands/saveAsTzx';
-import * as playToZxCmd from './commands/playToZx';
-import * as recordFromZxCmd from './commands/recordFromZx';
-import * as loadFromMdrCmd from './commands/loadFromMdr';
-import * as saveToMdrCmd from './commands/saveToMdr';
-import * as extractVariableCmd from './commands/refactor/extractVariable';
-import * as renumberLinesCmd from './commands/refactor/renumberLines';
-import * as extractSubroutineCmd from './commands/refactor/extractSubroutine';
+import * as transferCmd from "./commands/transfer";
+import * as saveAsTzxCmd from "./commands/saveAsTzx";
+import * as playToZxCmd from "./commands/playToZx";
+import * as recordFromZxCmd from "./commands/recordFromZx";
+import * as loadFromMdrCmd from "./commands/loadFromMdr";
+import * as saveToMdrCmd from "./commands/saveToMdr";
+import * as extractVariableCmd from "./commands/refactor/extractVariable";
+import * as renumberLinesCmd from "./commands/refactor/renumberLines";
+import * as extractSubroutineCmd from "./commands/refactor/extractSubroutine";
+import * as insertZxGraphicsCmd from "./commands/insertZxGraphics";
 
 let client: LanguageClient;
 
@@ -37,20 +38,20 @@ type SerializedPosition = { line: number; character: number };
 type SerializedRange = { start: SerializedPosition; end: SerializedPosition };
 type SerializedLocation = { uri: string; range: SerializedRange };
 
-const SHOW_REFERENCES_COMMAND = 'zx-basic.showReferences';
+const SHOW_REFERENCES_COMMAND = "zx-basic.showReferences";
 
 function isSerializedPosition(value: unknown): value is SerializedPosition {
   return (
-    typeof value === 'object' &&
+    typeof value === "object" &&
     value !== null &&
-    typeof (value as SerializedPosition).line === 'number' &&
-    typeof (value as SerializedPosition).character === 'number'
+    typeof (value as SerializedPosition).line === "number" &&
+    typeof (value as SerializedPosition).character === "number"
   );
 }
 
 function isSerializedRange(value: unknown): value is SerializedRange {
   return (
-    typeof value === 'object' &&
+    typeof value === "object" &&
     value !== null &&
     isSerializedPosition((value as SerializedRange).start) &&
     isSerializedPosition((value as SerializedRange).end)
@@ -59,9 +60,9 @@ function isSerializedRange(value: unknown): value is SerializedRange {
 
 function isSerializedLocation(value: unknown): value is SerializedLocation {
   return (
-    typeof value === 'object' &&
+    typeof value === "object" &&
     value !== null &&
-    typeof (value as SerializedLocation).uri === 'string' &&
+    typeof (value as SerializedLocation).uri === "string" &&
     isSerializedRange((value as SerializedLocation).range)
   );
 }
@@ -87,7 +88,7 @@ function transformShowReferencesLens(
 
   const [uriString, positionData, locationsData] = lens.command.arguments ?? [];
   if (
-    typeof uriString !== 'string' ||
+    typeof uriString !== "string" ||
     !isSerializedPosition(positionData) ||
     !Array.isArray(locationsData)
   ) {
@@ -102,12 +103,12 @@ function transformShowReferencesLens(
       .map(reviveLocation);
 
     lens.command = {
-      title: lens.command.title ?? 'Show References',
-      command: 'editor.action.showReferences',
+      title: lens.command.title ?? "Show References",
+      command: "editor.action.showReferences",
       arguments: [uri, position, locations],
     };
   } catch (error) {
-    console.error('Failed to convert ZX BASIC CodeLens command', error);
+    console.error("Failed to convert ZX BASIC CodeLens command", error);
   }
 
   return lens;
@@ -126,17 +127,17 @@ function transformShowReferencesLensArray(
 export function activate(context: ExtensionContext) {
   // The server is implemented in node
   const serverModule = context.asAbsolutePath(
-    path.join('out', 'server', 'server.js'),
+    path.join("out", "server", "server.js"),
   );
 
   // The debug options for the server
   // --inspect=6009: runs the server in Node's Inspector mode so VS Code can attach to the server for debugging
-  const debugOptions = { execArgv: ['--nolazy', '--inspect=6009'] };
+  const debugOptions = { execArgv: ["--nolazy", "--inspect=6009"] };
 
   // If the extension is launched in debug mode then the debug server options are used
   // Otherwise the run options are used
-  const config = workspace.getConfiguration('zxBasic');
-  const enableFormatOnType = config.get('enableFormatOnType', true);
+  const config = workspace.getConfiguration("zxBasic");
+  const enableFormatOnType = config.get("enableFormatOnType", true);
 
   const serverOptions: any = {
     run: { module: serverModule, transport: TransportKind.ipc },
@@ -180,18 +181,18 @@ export function activate(context: ExtensionContext) {
 
   const clientOptions: LanguageClientOptions = {
     // Register the server for plain text documents
-    documentSelector: [{ scheme: 'file', language: 'zx-basic' }],
+    documentSelector: [{ scheme: "file", language: "zx-basic" }],
     synchronize: {
       // Notify the server about file changes to '.clientrc files contained in the workspace
-      fileEvents: workspace.createFileSystemWatcher('**/.clientrc'),
+      fileEvents: workspace.createFileSystemWatcher("**/.clientrc"),
     },
     middleware,
   };
 
   // Create the language client and start the client.
   client = new LanguageClient(
-    'zxBasicServer',
-    'ZX BASIC Server',
+    "zxBasicServer",
+    "ZX BASIC Server",
     serverOptions,
     clientOptions,
   );
@@ -201,15 +202,15 @@ export function activate(context: ExtensionContext) {
 
   // Register notification handler for keyword uppercasing feedback
   client.onNotification(
-    'zxBasic/keywordUppercased',
+    "zxBasic/keywordUppercased",
     (params: { line: number; start: number; end: number; keyword: string }) => {
       console.log(
-        '[ZX BASIC] Received keywordUppercased notification:',
+        "[ZX BASIC] Received keywordUppercased notification:",
         JSON.stringify(params),
       );
 
       const editor = window.activeTextEditor;
-      if (editor && editor.document.languageId === 'zx-basic') {
+      if (editor && editor.document.languageId === "zx-basic") {
         console.log(
           `[ZX BASIC] Applying highlight to keyword '${params.keyword}' at line ${params.line}, chars ${params.start}-${params.end}`,
         );
@@ -223,7 +224,7 @@ export function activate(context: ExtensionContext) {
 
         // Create a decoration type for brief highlight
         const highlightDecoration = window.createTextEditorDecorationType({
-          backgroundColor: 'rgba(255, 255, 0, 0.3)',
+          backgroundColor: "rgba(255, 255, 0, 0.3)",
           isWholeLine: false,
         });
 
@@ -236,7 +237,7 @@ export function activate(context: ExtensionContext) {
         }, 500);
       } else {
         console.log(
-          '[ZX BASIC] No active editor or wrong language mode for keyword highlight',
+          "[ZX BASIC] No active editor or wrong language mode for keyword highlight",
         );
       }
     },
@@ -271,6 +272,9 @@ export function activate(context: ExtensionContext) {
   context.subscriptions.push(extractVariableCmd.register());
   context.subscriptions.push(renumberLinesCmd.register());
   context.subscriptions.push(extractSubroutineCmd.register());
+
+  // Register ZX graphics insertion command
+  context.subscriptions.push(insertZxGraphicsCmd.register());
 
   try {
     context.subscriptions.push(renumberLinesCmd.register());

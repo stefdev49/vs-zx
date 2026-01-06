@@ -58,6 +58,7 @@ Legend: `[x]` = Done, `[ ]` = To Do, `[ ] (WIP)` = In Progress.
 - [x] **Save as TZX** - Convert BASIC programs to TZX tape format for use with emulators and tape preservation tools
 - [x] **Play to ZX Spectrum** - Convert and play BASIC programs directly through audio using tzxplay, no file writing needed
 - [x] **Record from ZX Spectrum** - Convert BASIC programs directly from ZX Spectrum audio using tzxwav and audio recording, with proper token/number handling and spacing
+- [x] **ZX Graphics Character Support** - Full support for ZX Spectrum block graphics characters (0x80-0x8F) with Unicode display in VS Code, bidirectional conversion, and easy insertion
 - [x] **Advanced Refactoring** - Extract variables, extract subroutines, and other code transformations
 - [x] **Code Formatting** - Automatic line numbering, keyword uppercasing, and code cleanup
 - [x] **Save to mdr** - Convert BASIC programs to MDR format
@@ -118,9 +119,102 @@ Legend: `[x]` = Done, `[ ]` = To Do, `[ ] (WIP)` = In Progress.
 - [x] Document Highlights — Highlights all occurrences of a symbol (variables, line numbers, DEF FN functions) with read/write distinction.
 - [ ] Moniker/Indexing — Not yet implemented.
 
+## ZX Graphics Character Support
+
+The extension provides full support for ZX Spectrum block graphics characters (0x80-0x8F) with the following features:
+
+### Unicode Display in VS Code
+
+- ZX Spectrum graphics characters are displayed as visually matching Unicode block elements (U+2580-U+259F)
+- Characters appear as: █ ▓ ▒ ░ ▀ ▄ ▌ ▐ ▛ ▜ ▟ ▙ ▝ ▘ ▚ ▗
+- Easy to read and edit in the VS Code editor
+
+### Bidirectional Conversion
+
+- **Unicode → ZX Bytes**: When sending programs to ZX Spectrum, Unicode characters are automatically converted to the correct ZX byte codes (0x80-0x8F)
+- **ZX Bytes → Unicode**: When loading programs from ZX Spectrum, byte codes are automatically converted back to Unicode characters
+- Perfect round-trip conversion ensures no data loss
+
+### Easy Insertion
+
+- Use the **"Insert ZX Graphics Character"** command from the Command Palette
+- Quick pick menu shows all 16 graphics characters with their ZX byte codes
+- Detailed descriptions help you choose the right character
+- Multi-cursor support for inserting at multiple positions
+
+### Syntax Highlighting
+
+- ZX graphics characters are highlighted with a distinct color in the editor
+- Visual distinction makes graphics characters easy to identify in your code
+
+### Character Mapping
+
+| Unicode | ZX Byte | Description                                       |
+| ------- | ------- | ------------------------------------------------- |
+| █       | 0x80    | FULL BLOCK - All 4 quadrants filled               |
+| ▛       | 0x81    | QUADRANT UPPER LEFT - Top-left quadrant only      |
+| ▜       | 0x82    | QUADRANT UPPER RIGHT - Top-right quadrant only    |
+| ▟       | 0x83    | QUADRANT LOWER RIGHT - Bottom-right quadrant only |
+| ▙       | 0x84    | QUADRANT LOWER LEFT - Bottom-left quadrant only   |
+| ▝       | 0x85    | THREE QUADRANTS - Missing top-right quadrant      |
+| ▘       | 0x86    | THREE QUADRANTS - Missing bottom-left quadrant    |
+| ▚       | 0x87    | THREE QUADRANTS - Missing bottom-right quadrant   |
+| ▗       | 0x88    | THREE QUADRANTS - Missing bottom-right quadrant   |
+| ▀       | 0x89    | UPPER HALF BLOCK - Top half filled                |
+| ▄       | 0x8A    | LOWER HALF BLOCK - Bottom half filled             |
+| ▌       | 0x8B    | LEFT HALF BLOCK - Left half filled                |
+| ▐       | 0x8C    | RIGHT HALF BLOCK - Right half filled              |
+| ▖       | 0x8D    | QUADRANT LOWER LEFT - Alternative pattern         |
+| ▁       | 0x8E    | LOWER ONE EIGHTH BLOCK - Bottom row only          |
+| ▔       | 0x8F    | UPPER ONE EIGHTH BLOCK - Top row only             |
+
+### Usage Examples
+
+```basic
+10 PRINT "█▛▜▟"  ' Display quadrant characters
+20 PRINT "▀▄▌▐"  ' Display half-block characters
+30 PRINT "▙▝▘▚"  ' Display three-quadrant characters
+40 LET A$ = "▗▖▁▔"  ' Use graphics in string variables
+50 FOR I = 1 TO 10: PRINT "▛";: NEXT I  ' Create patterns
+```
+
+### Technical Details
+
+- **Character Range**: Unicode U+2580 to U+259F (Block Elements)
+- **ZX Byte Range**: 0x80 to 0x8F (16 characters)
+- **Conversion**: Uses `zx-charset.ts` for bidirectional mapping
+- **Validation**: Characters are validated during conversion to ensure they map to valid ZX bytes
+
+## LSP Feature Roadmap
+
+### Core Navigation
+
+- [x] Go to Definition — Jump to variable/function definitions via `onDefinition`.
+- [x] Find References — Locate all references to variables/functions through `onReferences`.
+- [x] Document Symbols — Outline view powered by `onDocumentSymbol`.
+- [x] Folding Ranges — Code folding for FOR...NEXT, subroutines, and DATA blocks.
+- [x] Selection Ranges — Smart selection expansion.
+- [x] Call Hierarchy — Visualize call graphs.
+- [x] Document Highlights — Highlight variable references.
+- [x] Inlay Hints — Show variable types and other contextual information.
+- [x] Semantic Tokens — Advanced syntax highlighting.
+- [x] Document Link — Not yet implemented.
+- [ ] Document Color — Not yet implemented.
+- [ ] Color Presentation — Not yet implemented.
+- [ ] Workspace Symbol — Not yet implemented.
+- [ ] Document Formatting — Not yet implemented.
+- [ ] Document Range Formatting — Not yet implemented.
+- [ ] Document On Type Formatting — Not yet implemented.
+- [ ] Rename — Not yet implemented.
+- [ ] Prepare Rename — Not yet implemented.
+- [ ] Execute Command — Not yet implemented.
+- [ ] Workspace File Watching — Not yet implemented.
+- [ ] Workspace Folders — Not yet implemented.
+- [ ] File Operations — Not yet implemented.
+- [ ] Progress Reporting — Not yet implemented.
+
 ### Workspace & Infrastructure
 
-- [ ] Execute Command — Not yet implemented.
 - [ ] Workspace File Watching — Not yet implemented.
 - [ ] Workspace Folders — Not yet implemented.
 - [ ] File Operations — Not yet implemented.
@@ -274,7 +368,11 @@ Additionally, you need audio recording tools based on your platform:
 3. In VS Code, open a ZX BASIC file and run: **ZX BASIC: Record from ZX Spectrum** (Ctrl+Shift+P)
 4. The extension will start recording audio and show progress in the status bar
 5. When recording is complete (or you stop it manually), the audio will be converted to TZX format
-6. The TZX file will be parsed and converted back to BASIC source code
+6. The TZX file will be parsed and converted back to BASIC source code with:
+   - Correct line numbers (ZX Spectrum format decoding)
+   - Proper token-to-keyword conversion using TOKEN_MAP
+   - Accurate number decoding from ZX Spectrum 5-byte float format
+   - Intelligent spacing after tokens and before numbers
 7. A new `.bas` file will be created with the extracted program
 
 ### Configuration

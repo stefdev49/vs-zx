@@ -19,6 +19,9 @@
       "include": "#functions"
     },
     {
+      "include": "#zx-graphics"
+    },
+    {
       "include": "#goto-gosub-targets"
     },
     {
@@ -172,5 +175,13 @@
         }
       ]
     }
+  },
+  "zx-graphics": {
+    "patterns": [
+      {
+        "match": "[█▓▒░▀▄▌▐▛▜▟▙▝▘▚▗]",
+        "name": "constant.character.zx-graphics"
+      }
+    ]
   }
 }

@@ -14,6 +14,10 @@ import * as fs from "fs";
 import * as os from "os";
 import * as converter from "converter";
 import { TOKEN_MAP } from "converter/out/core/token-map";
+import {
+  zxByteToUnicode,
+  isZxBlockGraphicsByte,
+} from "converter/out/core/zx-charset";
 
 let activeRecordingProcess: child_process.ChildProcess | null = null;
 let recordingStatusBar: StatusBarItem | null = null;
@@ -585,7 +589,7 @@ async function convertTzxToBasic(tzxFile: string, outputDirectory: string) {
   }
 }
 
-function convertTapToBasicSource(tapBuffer: Buffer): string {
+export function convertTapToBasicSource(tapBuffer: Buffer): string {
   // TAP to BASIC conversion with proper token and number handling
   let result = "";
   let i = 0;
@@ -733,6 +737,18 @@ function convertTapToBasicSource(tapBuffer: Buffer): string {
               lineContent[k] < 0xa3
             ) {
               result += " ";
+            }
+          } else if (isZxBlockGraphicsByte(byte)) {
+            // ZX Spectrum block graphics character
+            const char = zxByteToUnicode(byte);
+            if (char) {
+              result += char;
+              needsSpace = false; // Graphics characters don't need space after them
+              k++;
+            } else {
+              // Fallback to hex if conversion fails
+              result += `[${byte.toString(16)}]`;
+              k++;
             }
           } else if (byte >= 32 && byte < 127) {
             // Printable ASCII

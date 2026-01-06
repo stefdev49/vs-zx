@@ -18,6 +18,15 @@ A complete development environment for ZX Spectrum BASIC programming. Write, for
 - Line number validation (1-9999)
 - Duplicate line detection
 - Missing line number warnings
+
+### 🎮 ZX Graphics Character Support
+
+- **Unicode Display**: ZX Spectrum block graphics characters (0x80-0x8F) displayed as visually matching Unicode block patterns (not shade characters)
+- **Bidirectional Conversion**: Automatic conversion between Unicode block patterns and ZX byte codes
+- **Easy Insertion**: Quick pick menu for inserting graphics characters with byte code preview and descriptions
+- **Syntax Highlighting**: Distinct color for graphics characters in the editor
+- **Round-trip Support**: Perfect preservation of graphics characters when loading/saving programs
+- **Correct Patterns**: Uses actual ZX Spectrum 2×2 block patterns, not shade characters
 - FOR/NEXT and IF/THEN matching
 - Type checking (string vs numeric)
 - Color value validation

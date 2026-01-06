@@ -1,9 +1,10 @@
-import { TOKEN_MAP, TokenInfo } from './token-map';
+import { TOKEN_MAP, TokenInfo } from "./token-map";
+import { unicodeToZxByte } from "./zx-charset";
 
 const REM_TOKEN = 0xea;
 const DEFFN_TOKEN = 0xce;
 const THEN_TOKEN = 0xcb;
-const COLON_TOKEN = ':'.charCodeAt(0);
+const COLON_TOKEN = ":".charCodeAt(0);
 const BIN_TOKEN = 0xc4;
 const MAX_BASIC_LINE = 10000;
 const MAX_TAP_SIZE = 41500;
@@ -50,18 +51,18 @@ interface ConversionState {
 
 export function convertBasicSource(
   source: string,
-  options: Bas2TapOptions = {}
+  options: Bas2TapOptions = {},
 ): ConvertArtifacts {
   const state: ConversionState = {
     previousLineNumber: -1,
     warnings: [],
     caseInsensitive:
       options.caseInsensitive === undefined ? true : options.caseInsensitive,
-    suppressWarnings: Boolean(options.suppressWarnings)
+    suppressWarnings: Boolean(options.suppressWarnings),
   };
 
   const rawLines: number[][] = [];
-  const physicalLines = source.replace(/\r\n?/g, '\n').split('\n');
+  const physicalLines = source.replace(/\r\n?/g, "\n").split("\n");
 
   physicalLines.forEach((line, index) => {
     const prepared = prepareLine(line, index + 1, state);
@@ -79,7 +80,7 @@ export function convertBasicSource(
   const objects: ObjectInfo[] = [];
   const parts: Buffer[] = [];
   let currentOffset = 0;
-  rawLines.forEach(bytes => {
+  rawLines.forEach((bytes) => {
     const buf = Buffer.from(bytes);
     parts.push(buf);
     const ln = (buf[0] << 8) | buf[1];
@@ -89,43 +90,59 @@ export function convertBasicSource(
   const rawBuffer = Buffer.concat(parts);
 
   if (rawBuffer.length > MAX_TAP_SIZE) {
-    throw new Error('ERROR - Object file too large');
+    throw new Error("ERROR - Object file too large");
   }
 
-  const programName = (options.programName ?? '').slice(0, 10);
-  const tapBuffer = buildTap(rawBuffer, programName, options.autostart ?? 0x8000);
+  const programName = (options.programName ?? "").slice(0, 10);
+  const tapBuffer = buildTap(
+    rawBuffer,
+    programName,
+    options.autostart ?? 0x8000,
+  );
 
   return {
     raw: rawBuffer,
     tap: tapBuffer,
-    warnings: state.warnings
+    warnings: state.warnings,
   };
 }
 
-export function convertBasicWithObjects(source: string, options: Bas2TapOptions = {}): { artifacts: ConvertArtifacts; objects: ObjectInfo[] } {
+export function convertBasicWithObjects(
+  source: string,
+  options: Bas2TapOptions = {},
+): { artifacts: ConvertArtifacts; objects: ObjectInfo[] } {
   const artifacts = convertBasicSource(source, options);
   const objects: ObjectInfo[] = [];
   const state: ConversionState = {
     previousLineNumber: -1,
     warnings: [],
-    caseInsensitive: options.caseInsensitive === undefined ? true : options.caseInsensitive,
-    suppressWarnings: Boolean(options.suppressWarnings)
+    caseInsensitive:
+      options.caseInsensitive === undefined ? true : options.caseInsensitive,
+    suppressWarnings: Boolean(options.suppressWarnings),
   };
-  const physicalLines = source.replace(/\r\n?/g, '\n').split('\n');
+  const physicalLines = source.replace(/\r\n?/g, "\n").split("\n");
   let currentOffset = 0;
   physicalLines.forEach((line, index) => {
     const prepared = prepareLine(line, index + 1, state);
     if (!prepared) return;
     const built = buildLine(prepared, state);
     if (built) {
-      objects.push({ lineNumber: built.lineNumber, offset: currentOffset, length: built.bytes.length });
+      objects.push({
+        lineNumber: built.lineNumber,
+        offset: currentOffset,
+        length: built.bytes.length,
+      });
       currentOffset += built.bytes.length;
     }
   });
   return { artifacts, objects };
 }
 
-function prepareLine(line: string, fileLineNo: number, state: ConversionState): PreparedLine | null {
+function prepareLine(
+  line: string,
+  fileLineNo: number,
+  state: ConversionState,
+): PreparedLine | null {
   let inString = false;
   let doingRem = false;
   let singleSeparator = false;
@@ -135,30 +152,34 @@ function prepareLine(line: string, fileLineNo: number, state: ConversionState): 
     const ch = line[idx];
     const code = ch.charCodeAt(0);
 
-    if (ch === '\t') {
+    if (ch === "\t") {
       output.push(String.fromCharCode(TAB_CHAR));
       continue;
     }
 
-    if (code < 32 || code > 126) {
-      if (code === 0x0d || code === 0x0a) {
+    if (code < 32 || (code > 126 && code !== 0x0d && code !== 0x0a)) {
+      // Allow ZX graphics characters (Unicode block elements)
+      // These will be handled by the unicodeToZxByte function
+      if (code >= 0x2580 && code <= 0x259f) {
+        output.push(ch);
         continue;
       }
+
       throw new Error(
-        `ERROR - ASCII line ${fileLineNo} contains a bad character (code ${code.toString(16)}h)`
+        `ERROR - ASCII line ${fileLineNo} contains a bad character (code ${code.toString(16)}h)`,
       );
     }
 
     if (!doingRem) {
       const upperAhead = line.slice(idx).toUpperCase();
-      if (upperAhead.startsWith(' REM ') || upperAhead.startsWith(':REM ')) {
+      if (upperAhead.startsWith(" REM ") || upperAhead.startsWith(":REM ")) {
         doingRem = true;
       }
     }
 
     if (inString || doingRem) {
       output.push(ch);
-    } else if (ch === ' ') {
+    } else if (ch === " ") {
       if (!singleSeparator) {
         output.push(ch);
         singleSeparator = true;
@@ -173,13 +194,15 @@ function prepareLine(line: string, fileLineNo: number, state: ConversionState): 
     }
   }
 
-  const prepared = output.join('');
+  const prepared = output.join("");
   const lineNumberMatch = prepared.match(/^(\s*)(\d+)/);
 
   if (!lineNumberMatch) {
     if (prepared.trim().length === 0) {
       if (!state.suppressWarnings) {
-        state.warnings.push(`WARNING - Skipping empty ASCII line ${fileLineNo}`);
+        state.warnings.push(
+          `WARNING - Skipping empty ASCII line ${fileLineNo}`,
+        );
       }
       return null;
     }
@@ -192,16 +215,23 @@ function prepareLine(line: string, fileLineNo: number, state: ConversionState): 
   }
 
   if (lineNumber >= MAX_BASIC_LINE) {
-    throw new Error(`ERROR - Line number ${lineNumber} is larger than the maximum allowed`);
+    throw new Error(
+      `ERROR - Line number ${lineNumber} is larger than the maximum allowed`,
+    );
   }
 
   if (state.previousLineNumber >= 0) {
     if (lineNumber < state.previousLineNumber) {
       throw new Error(
-        `ERROR - Line number ${lineNumber} is smaller than previous line number ${state.previousLineNumber}`
+        `ERROR - Line number ${lineNumber} is smaller than previous line number ${state.previousLineNumber}`,
       );
-    } else if (lineNumber === state.previousLineNumber && !state.suppressWarnings) {
-      state.warnings.push(`WARNING - Duplicate use of line number ${lineNumber}`);
+    } else if (
+      lineNumber === state.previousLineNumber &&
+      !state.suppressWarnings
+    ) {
+      state.warnings.push(
+        `WARNING - Duplicate use of line number ${lineNumber}`,
+      );
     }
   }
 
@@ -211,10 +241,13 @@ function prepareLine(line: string, fileLineNo: number, state: ConversionState): 
     throw new Error(`ERROR - Line ${lineNumber} contains no statements!`);
   }
 
-  return { lineNumber, prepared: rest + '\r' };
+  return { lineNumber, prepared: rest + "\r" };
 }
 
-function buildLine(prepped: PreparedLine, state: ConversionState): LineBuildResult | null {
+function buildLine(
+  prepped: PreparedLine,
+  state: ConversionState,
+): LineBuildResult | null {
   const content = prepped.prepared;
   const bytes: number[] = new Array(4).fill(0);
   let resultIndex = 4;
@@ -235,7 +268,7 @@ function buildLine(prepped: PreparedLine, state: ConversionState): LineBuildResu
 
   while (idx < content.length) {
     const ch = content[idx];
-    if (ch === '\r') {
+    if (ch === "\r") {
       break;
     }
 
@@ -244,7 +277,7 @@ function buildLine(prepped: PreparedLine, state: ConversionState): LineBuildResu
         inString = false;
         appendChar(ch);
         idx++;
-        while (content[idx] === ' ') idx++;
+        while (content[idx] === " ") idx++;
         continue;
       }
 
@@ -262,7 +295,7 @@ function buildLine(prepped: PreparedLine, state: ConversionState): LineBuildResu
     if (ch === '"') {
       if (expectKeyword) {
         throw new Error(
-          `ERROR in line ${prepped.lineNumber} - Expected keyword but got quote`
+          `ERROR in line ${prepped.lineNumber} - Expected keyword but got quote`,
         );
       }
       inString = true;
@@ -275,7 +308,7 @@ function buildLine(prepped: PreparedLine, state: ConversionState): LineBuildResu
       const match = matchToken(content, idx, true, state.caseInsensitive);
       if (!match) {
         throw new Error(
-          `ERROR in line ${prepped.lineNumber} - Expected keyword but got "${content[idx] ?? ''}"`
+          `ERROR in line ${prepped.lineNumber} - Expected keyword but got "${content[idx] ?? ""}"`,
         );
       }
       appendByte(match.code);
@@ -284,7 +317,7 @@ function buildLine(prepped: PreparedLine, state: ConversionState): LineBuildResu
         expectKeyword = false;
       }
       if (match.code === REM_TOKEN) {
-        while (idx < content.length && content[idx] !== '\r') {
+        while (idx < content.length && content[idx] !== "\r") {
           const expanded = expandSequence(content, idx, appendByte, false);
           if (expanded.consumed > 0) {
             idx += expanded.consumed;
@@ -301,7 +334,7 @@ function buildLine(prepped: PreparedLine, state: ConversionState): LineBuildResu
       continue;
     }
 
-    if (ch === '(') {
+    if (ch === "(") {
       bracketCount++;
       appendChar(ch);
       idx++;
@@ -311,7 +344,7 @@ function buildLine(prepped: PreparedLine, state: ConversionState): LineBuildResu
       continue;
     }
 
-    if (ch === ')') {
+    if (ch === ")") {
       bracketCount--;
       appendChar(ch);
       idx++;
@@ -325,11 +358,19 @@ function buildLine(prepped: PreparedLine, state: ConversionState): LineBuildResu
       continue;
     }
 
-    const nonKeywordMatch = matchToken(content, idx, false, state.caseInsensitive);
+    const nonKeywordMatch = matchToken(
+      content,
+      idx,
+      false,
+      state.caseInsensitive,
+    );
     if (nonKeywordMatch) {
       appendByte(nonKeywordMatch.code);
       idx = nonKeywordMatch.nextIndex;
-      if (nonKeywordMatch.code === THEN_TOKEN || nonKeywordMatch.code === COLON_TOKEN) {
+      if (
+        nonKeywordMatch.code === THEN_TOKEN ||
+        nonKeywordMatch.code === COLON_TOKEN
+      ) {
         expectKeyword = true;
         handlingDefFn = false;
       }
@@ -338,7 +379,7 @@ function buildLine(prepped: PreparedLine, state: ConversionState): LineBuildResu
           content,
           idx,
           appendByte,
-          prepped.lineNumber
+          prepped.lineNumber,
         );
         idx += binResult.consumed;
       }
@@ -357,9 +398,9 @@ function buildLine(prepped: PreparedLine, state: ConversionState): LineBuildResu
       continue;
     }
 
-    if (ch === ' ') {
+    if (ch === " ") {
       appendByte(0x20);
-      while (idx < content.length && content[idx] === ' ') {
+      while (idx < content.length && content[idx] === " ") {
         idx++;
       }
       continue;
@@ -369,6 +410,14 @@ function buildLine(prepped: PreparedLine, state: ConversionState): LineBuildResu
       while (idx < content.length && /[A-Za-z0-9\$]/.test(content[idx])) {
         appendChar(content[idx++]);
       }
+      continue;
+    }
+
+    // Handle ZX graphics characters (Unicode block elements)
+    const zxByte = unicodeToZxByte(ch);
+    if (zxByte !== null) {
+      appendByte(zxByte);
+      idx++;
       continue;
     }
 
@@ -392,13 +441,14 @@ function matchToken(
   line: string,
   start: number,
   wantKeyword: boolean,
-  caseInsensitive: boolean
+  caseInsensitive: boolean,
 ): { code: number; nextIndex: number } | null {
-  if (line[start] === ':') {
+  if (line[start] === ":") {
     return { code: COLON_TOKEN, nextIndex: skipSpaces(line, start + 1) };
   }
 
-  let bestMatch: { code: number; length: number; nextIndex: number } | null = null;
+  let bestMatch: { code: number; length: number; nextIndex: number } | null =
+    null;
 
   for (let code = 0xa3; code < TOKEN_MAP.length; code++) {
     const entry = TOKEN_MAP[code];
@@ -426,7 +476,7 @@ function matchToken(
       bestMatch = {
         code,
         length: token.length,
-        nextIndex: skipSpaces(line, matchEnd)
+        nextIndex: skipSpaces(line, matchEnd),
       };
     }
   }
@@ -445,7 +495,7 @@ function matchToken(
 
   return {
     code: bestMatch.code,
-    nextIndex: bestMatch.nextIndex
+    nextIndex: bestMatch.nextIndex,
   };
 }
 
@@ -453,9 +503,9 @@ function matchTokenAt(
   line: string,
   start: number,
   token: string,
-  caseInsensitive: boolean
+  caseInsensitive: boolean,
 ): number | null {
-  if (!token.includes(' ')) {
+  if (!token.includes(" ")) {
     const segment = line.slice(start, start + token.length);
     const matches = caseInsensitive
       ? segment.toUpperCase() === token.toUpperCase()
@@ -468,11 +518,11 @@ function matchTokenAt(
 
   while (tokenIdx < token.length) {
     const tokenChar = token[tokenIdx];
-    if (tokenChar === ' ') {
-      while (tokenIdx < token.length && token[tokenIdx] === ' ') {
+    if (tokenChar === " ") {
+      while (tokenIdx < token.length && token[tokenIdx] === " ") {
         tokenIdx++;
       }
-      while (lineIdx < line.length && line[lineIdx] === ' ') {
+      while (lineIdx < line.length && line[lineIdx] === " ") {
         lineIdx++;
       }
       continue;
@@ -501,7 +551,7 @@ function matchTokenAt(
 }
 
 function skipSpaces(line: string, index: number): number {
-  while (index < line.length && line[index] === ' ') index++;
+  while (index < line.length && line[index] === " ") index++;
   return index;
 }
 
@@ -515,7 +565,7 @@ function handleBinaryLiteral(
   line: string,
   start: number,
   appendByte: (value: number) => void,
-  lineNumber: number
+  lineNumber: number,
 ): { consumed: number } {
   let idx = start;
   let value = 0;
@@ -523,10 +573,10 @@ function handleBinaryLiteral(
 
   while (idx < line.length) {
     const ch = line[idx];
-    if (ch !== '0' && ch !== '1') {
+    if (ch !== "0" && ch !== "1") {
       break;
     }
-    const nextValue = value * 2 + (ch === '1' ? 1 : 0);
+    const nextValue = value * 2 + (ch === "1" ? 1 : 0);
     if (nextValue > 0xffff) {
       throw new Error(`ERROR - Number too big in line ${lineNumber}`);
     }
@@ -537,7 +587,9 @@ function handleBinaryLiteral(
   }
 
   if (consumed === 0) {
-    throw new Error(`ERROR in line ${lineNumber} - Expected binary literal after BIN`);
+    throw new Error(
+      `ERROR in line ${lineNumber} - Expected binary literal after BIN`,
+    );
   }
 
   appendByte(0x0e);
@@ -553,7 +605,7 @@ function handleBinaryLiteral(
 function handleNumberLiteral(
   line: string,
   start: number,
-  appendByte: (value: number) => void
+  appendByte: (value: number) => void,
 ): { consumed: number } {
   let idx = start;
   let sawDigit = false;
@@ -562,7 +614,7 @@ function handleNumberLiteral(
     idx++;
     sawDigit = true;
   }
-  if (line[idx] === '.') {
+  if (line[idx] === ".") {
     appendByte(line.charCodeAt(idx++));
     while (idx < line.length && /[0-9]/.test(line[idx])) {
       appendByte(line.charCodeAt(idx));
@@ -577,7 +629,7 @@ function handleNumberLiteral(
   const asciiLiteral = line.slice(start, idx);
   const numericValue = Number(asciiLiteral);
   if (Number.isNaN(numericValue)) {
-    throw new Error('ERROR - Invalid numeric literal');
+    throw new Error("ERROR - Invalid numeric literal");
   }
 
   const encoded = encodeNumber(numericValue);
@@ -588,7 +640,12 @@ function handleNumberLiteral(
 function encodeNumber(value: number): number[] {
   const result = [0x0e, 0x00, 0x00, 0x00, 0x00, 0x00];
   const intValue = value | 0;
-  if (Number.isFinite(value) && value === intValue && value >= -65536 && value < 65536) {
+  if (
+    Number.isFinite(value) &&
+    value === intValue &&
+    value >= -65536 &&
+    value < 65536
+  ) {
     result[1] = 0x00;
     if (intValue >= 0) {
       result[2] = 0x00;
@@ -612,9 +669,11 @@ function encodeNumber(value: number): number[] {
   }
   const exponent = Math.floor(Math.log2(absValue));
   if (exponent < -129 || exponent > 126) {
-    throw new Error('ERROR - Number too big');
+    throw new Error("ERROR - Number too big");
   }
-  const mantissa = Math.floor(((absValue / Math.pow(2, exponent)) - 1) * Math.pow(2, 31) + 0.5);
+  const mantissa = Math.floor(
+    (absValue / Math.pow(2, exponent) - 1) * Math.pow(2, 31) + 0.5,
+  );
   result[1] = (exponent + 0x81) & 0xff;
   result[2] = ((mantissa >>> 24) & 0x7f) | sign;
   result[3] = (mantissa >>> 16) & 0xff;
@@ -627,13 +686,13 @@ function expandSequence(
   line: string,
   start: number,
   appendByte: (value: number) => void,
-  stripSpaces: boolean
+  stripSpaces: boolean,
 ): { consumed: number } {
-  if (line[start] !== '{') {
+  if (line[start] !== "{") {
     return { consumed: 0 };
   }
   const rest = line.slice(start + 1);
-  if (rest.startsWith('(C)}')) {
+  if (rest.startsWith("(C)}")) {
     appendByte(0x7f);
     return { consumed: 5 };
   }
