@@ -533,6 +533,28 @@ export async function validateTextDocument(
     }
   });
 
+  // Check for line number ordering (must be in ascending order)
+  let previousLineNumber = -1;
+  tokens.forEach((token) => {
+    if (token.type === TokenType.LINE_NUMBER) {
+      const lineNum = parseInt(token.value, 10);
+
+      if (lineNum < previousLineNumber) {
+        diagnostics.push({
+          severity: DiagnosticSeverity.Error,
+          range: {
+            start: { line: token.line, character: token.start },
+            end: { line: token.line, character: token.end },
+          },
+          message: `Line number ${lineNum} is smaller than previous line number ${previousLineNumber}. ZX BASIC requires line numbers in ascending order.`,
+          source: "zx-basic-lsp",
+        });
+      }
+
+      previousLineNumber = lineNum;
+    }
+  });
+
   // Check for lines without line numbers (must start with line number or be empty/comment)
   const lines = text.split("\n");
   for (let i = 0; i < lines.length; i++) {
@@ -2780,7 +2802,11 @@ function analyzeVariableUsage(
         }
 
         // Check if it's a FOR loop variable
-        if (!isFunctionReference && i > 0 && tokens[i - 1].type === TokenType.FOR) {
+        if (
+          !isFunctionReference &&
+          i > 0 &&
+          tokens[i - 1].type === TokenType.FOR
+        ) {
           isDeclaration = true;
           context = "FOR";
         }
@@ -4745,20 +4771,18 @@ connection.onColorPresentation(
 );
 
 // Inlay Hint Provider - shows inline hints for GOTO/GOSUB targets
-connection.languages.inlayHint.on(
-  (params: InlayHintParams): InlayHint[] => {
-    const document = documents.get(params.textDocument.uri);
-    if (!document) {
-      return [];
-    }
+connection.languages.inlayHint.on((params: InlayHintParams): InlayHint[] => {
+  const document = documents.get(params.textDocument.uri);
+  if (!document) {
+    return [];
+  }
 
-    const text = document.getText();
-    const lexer = new ZXBasicLexer();
-    const tokens = lexer.tokenize(text);
+  const text = document.getText();
+  const lexer = new ZXBasicLexer();
+  const tokens = lexer.tokenize(text);
 
-    return getInlayHints(tokens);
-  },
-);
+  return getInlayHints(tokens);
+});
 
 // Document Highlight Provider - highlights all occurrences of a symbol
 connection.onDocumentHighlight(
