@@ -138,14 +138,44 @@ The extension provides full support for ZX Spectrum block graphics characters (0
 ### Easy Insertion
 
 - Use the **"Insert ZX Graphics Character"** command from the Command Palette
+- **4×4 Grid Picker**: Right-click in ZX BASIC files to access a visual 4×4 grid picker
 - Quick pick menu shows all 16 graphics characters with their ZX byte codes
 - Detailed descriptions help you choose the right character
 - Multi-cursor support for inserting at multiple positions
+- **Grid Navigation**: Each character shows its Row/Col position for easy selection
 
 ### Syntax Highlighting
 
 - ZX graphics characters are highlighted with a distinct color in the editor
 - Visual distinction makes graphics characters easy to identify in your code
+
+### 4×4 Graphics Character Picker
+
+The extension features an enhanced **4×4 Grid Picker** for easy graphics character insertion:
+
+**Access Methods:**
+
+- **Right-click context menu** in ZX BASIC files → "Insert ZX Graphics Character"
+- **Command Palette** (Ctrl+Shift+P) → "Insert ZX Graphics Character"
+- **Editor title menu** → ZX BASIC commands
+
+**Grid Layout:**
+
+```
+Row 1: [Space 0x80] [▝ 0x81] [▘ 0x82] [▀ 0x83]
+Row 2: [▗ 0x84] [▐ 0x85] [▚ 0x86] [▜ 0x87]
+Row 3: [▖ 0x88] [▞ 0x89] [▌ 0x8A] [▛ 0x8B]
+Row 4: [▄ 0x8C] [▟ 0x8D] [▙ 0x8E] [█ 0x8F]
+```
+
+**Features:**
+
+- **Visual Grid**: 4×4 layout with clear Row/Col positioning
+- **Character Preview**: See the actual graphics character in the picker
+- **Detailed Info**: Shows ZX byte code and full description for each character
+- **Quick Navigation**: Use arrow keys or mouse to navigate the grid
+- **Multi-cursor Support**: Insert at all cursor positions simultaneously
+- **Success Feedback**: Shows confirmation with character info and grid position
 
 ### Character Mapping
 
@@ -173,7 +203,8 @@ The extension provides full support for ZX Spectrum block graphics characters (0
 ```basic
 10 PRINT "█▛▜▟"  ' Display quadrant characters
 20 PRINT "▀▄▌▐"  ' Display half-block characters
-30 PRINT "▙▝▘▚"  ' Display three-quadrant characters
+310 PRINT " ";"▝";"▘";"▀";"▗";"▐";"▚";"▜"  ' 4x4 Grid Row 1
+320 PRINT "▖";"▞";"▌";"▛";"▄";"▟";"▙";"█"  ' 4x4 Grid Row 2
 40 LET A$ = "▗▖▁▔"  ' Use graphics in string variables
 50 FOR I = 1 TO 10: PRINT "▛";: NEXT I  ' Create patterns
 ```
@@ -184,6 +215,8 @@ The extension provides full support for ZX Spectrum block graphics characters (0
 - **ZX Byte Range**: 0x80 to 0x8F (16 characters)
 - **Conversion**: Uses `zx-charset.ts` for bidirectional mapping
 - **Validation**: Characters are validated during conversion to ensure they map to valid ZX bytes
+- **Grid Layout**: 4×4 visual picker with Row/Col navigation
+- **Context Menu**: Accessible via right-click in ZX BASIC files
 
 ## LSP Feature Roadmap
 

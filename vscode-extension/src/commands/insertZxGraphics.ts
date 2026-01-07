@@ -42,7 +42,12 @@ async function insertZxGraphicsCharacter() {
   const graphicsChars = getZxBlockGraphicsChars();
 
   // Build grid data for the webview
-  const gridData: Array<{ char: string; byte: number | null; row: number; col: number }> = [];
+  const gridData: Array<{
+    char: string;
+    byte: number | null;
+    row: number;
+    col: number;
+  }> = [];
   for (let row = 0; row < 4; row++) {
     for (let col = 0; col < 4; col++) {
       const index = row * 4 + col;
@@ -53,6 +58,9 @@ async function insertZxGraphicsCharacter() {
       }
     }
   }
+
+  // Track selected characters
+  let selectedCharacters: Array<{ char: string; byte: number }> = [];
 
   // Create or show the webview panel
   if (currentPanel) {
@@ -65,7 +73,7 @@ async function insertZxGraphicsCharacter() {
       {
         enableScripts: true,
         retainContextWhenHidden: false,
-      }
+      },
     );
 
     currentPanel.onDidDispose(() => {
@@ -77,35 +85,59 @@ async function insertZxGraphicsCharacter() {
   currentPanel.webview.html = getWebviewContent(gridData);
 
   // Handle messages from the webview
-  currentPanel.webview.onDidReceiveMessage(
-    async (message) => {
-      if (message.command === "insertCharacter") {
-        const char = message.char;
-        const byte = message.byte;
+  currentPanel.webview.onDidReceiveMessage(async (message) => {
+    if (message.command === "addCharacter") {
+      const char = message.char;
+      const byte = message.byte;
 
-        // Insert the selected character at cursor position(s)
-        await editor.edit((editBuilder) => {
-          editor.selections.forEach((selection) => {
-            const position = selection.active;
-            editBuilder.insert(position, char);
-          });
-        });
+      // Add character to selection
+      selectedCharacters.push({ char, byte });
 
-        // Show success message
-        window.showInformationMessage(
-          `Inserted ZX graphics character "${char}" (0x${byte?.toString(16).toUpperCase()})`
-        );
-
-        // Close the panel after insertion
+      // Update the webview to show current selection
+      currentPanel!.webview.postMessage({
+        command: "updateSelection",
+        selection: selectedCharacters,
+      });
+    } else if (message.command === "confirmSelection") {
+      if (selectedCharacters.length === 0) {
         currentPanel?.dispose();
-      } else if (message.command === "close") {
-        currentPanel?.dispose();
+        return;
       }
+
+      // Insert all selected characters at cursor position(s)
+      const charactersText = selectedCharacters.map((c) => c.char).join("");
+
+      await editor.edit((editBuilder) => {
+        editor.selections.forEach((selection) => {
+          const position = selection.active;
+          editBuilder.insert(position, charactersText);
+        });
+      });
+
+      // Show success message
+      const byteInfo = selectedCharacters
+        .map((c) => `0x${c.byte.toString(16).toUpperCase()}`)
+        .join(", ");
+      window.showInformationMessage(
+        `Inserted ${selectedCharacters.length} ZX graphics character(s): ${charactersText} (${byteInfo})`,
+      );
+
+      // Close the panel after insertion
+      currentPanel?.dispose();
+    } else if (message.command === "close") {
+      currentPanel?.dispose();
     }
-  );
+  });
 }
 
-function getWebviewContent(gridData: Array<{ char: string; byte: number | null; row: number; col: number }>): string {
+function getWebviewContent(
+  gridData: Array<{
+    char: string;
+    byte: number | null;
+    row: number;
+    col: number;
+  }>,
+): string {
   // Generate the 4x4 grid HTML
   let gridHtml = "";
   for (let row = 0; row < 4; row++) {
@@ -113,7 +145,8 @@ function getWebviewContent(gridData: Array<{ char: string; byte: number | null; 
     for (let col = 0; col < 4; col++) {
       const item = gridData.find((d) => d.row === row && d.col === col);
       if (item) {
-        const byteStr = item.byte?.toString(16).toUpperCase().padStart(2, "0") || "??";
+        const byteStr =
+          item.byte?.toString(16).toUpperCase().padStart(2, "0") || "??";
         gridHtml += `
           <button class="grid-cell" data-char="${encodeURIComponent(item.char)}" data-byte="${item.byte}" title="0x${byteStr}">
             <span class="char">${item.char}</span>
@@ -201,8 +234,48 @@ function getWebviewContent(gridData: Array<{ char: string; byte: number | null; 
       color: var(--vscode-descriptionForeground);
       text-align: center;
     }
-    .close-btn {
+    .selection-preview {
+      margin-top: 20px;
+      background: var(--vscode-editor-background);
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--vscode-panel-border);
+      min-height: 60px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .selection-title {
+      font-size: 13px;
+      color: var(--vscode-descriptionForeground);
+      margin-bottom: 8px;
+      font-weight: bold;
+    }
+    .selection-chars {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+      min-height: 40px;
+    }
+    .selected-char {
+      font-size: 24px;
+      padding: 4px 8px;
+      background: var(--vscode-button-secondaryBackground);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 32px;
+      height: 32px;
+    }
+    .button-container {
+      display: flex;
+      gap: 12px;
       margin-top: 16px;
+    }
+    .close-btn, .ok-btn {
       padding: 8px 16px;
       background: var(--vscode-button-background);
       color: var(--vscode-button-foreground);
@@ -211,39 +284,109 @@ function getWebviewContent(gridData: Array<{ char: string; byte: number | null; 
       cursor: pointer;
       font-size: 13px;
     }
+    .close-btn:hover, .ok-btn:hover {
+      background: var(--vscode-button-hoverBackground);
+    }
+    .ok-btn {
+      background: var(--vscode-button-secondaryBackground);
+    }
+    .ok-btn:hover {
+      background: var(--vscode-button-secondaryHoverBackground);
+    }
+    .ok-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
     .close-btn:hover {
       background: var(--vscode-button-hoverBackground);
     }
   </style>
 </head>
-<body>
-  <h1>🎮 ZX Spectrum Graphics Picker</h1>
-  <div class="grid-container">
-    ${gridHtml}
-  </div>
-  <p class="instructions">Click a character to insert it at cursor position.<br>Use Tab/Arrow keys to navigate.</p>
-  <button class="close-btn" id="closeBtn">Cancel</button>
+  <body>
+    <h1>🎮 ZX Spectrum Graphics Picker</h1>
+    <div class="grid-container">
+      ${gridHtml}
+    </div>
+    <div class="selection-preview">
+      <div class="selection-title">Selected Characters (click to add, Enter to confirm):</div>
+      <div class="selection-chars" id="selectionChars"></div>
+    </div>
+    <p class="instructions">Click characters to add them to selection.<br>Press Enter to confirm, Backspace to remove last character, or ESC to cancel.</p>
+    <div class="button-container">
+      <button class="ok-btn" id="okBtn" disabled>OK</button>
+      <button class="close-btn" id="closeBtn">Cancel</button>
+    </div>
   
-  <script>
-    const vscode = acquireVsCodeApi();
-    
-    // Handle cell clicks
-    document.querySelectorAll('.grid-cell').forEach(cell => {
-      cell.addEventListener('click', () => {
-        const char = decodeURIComponent(cell.dataset.char);
-        const byte = parseInt(cell.dataset.byte, 10);
-        vscode.postMessage({
-          command: 'insertCharacter',
-          char: char,
-          byte: byte
+   <script>
+      const vscode = acquireVsCodeApi();
+      
+      // Track selected characters
+      let selectedCharacters = [];
+      
+      // Handle cell clicks
+      document.querySelectorAll('.grid-cell').forEach(cell => {
+        cell.addEventListener('click', () => {
+          const char = decodeURIComponent(cell.dataset.char);
+          const byte = parseInt(cell.dataset.byte, 10);
+          
+          // Add character to selection
+          selectedCharacters.push({ char, byte });
+          
+          // Update UI
+          updateSelectionUI();
+          
+          // Send message to extension
+          vscode.postMessage({
+            command: 'addCharacter',
+            char: char,
+            byte: byte
+          });
         });
       });
-    });
-    
-    // Handle close button
-    document.getElementById('closeBtn').addEventListener('click', () => {
-      vscode.postMessage({ command: 'close' });
-    });
+      
+      // Handle OK button
+      document.getElementById('okBtn').addEventListener('click', () => {
+        if (selectedCharacters.length > 0) {
+          vscode.postMessage({
+            command: 'confirmSelection'
+          });
+        }
+      });
+      
+      // Handle close button
+      document.getElementById('closeBtn').addEventListener('click', () => {
+        vscode.postMessage({ command: 'close' });
+      });
+      
+      // Update selection UI
+      function updateSelectionUI() {
+        const selectionChars = document.getElementById('selectionChars');
+        const okBtn = document.getElementById('okBtn');
+        
+        // Clear current selection
+        selectionChars.innerHTML = '';
+        
+        // Add selected characters
+        selectedCharacters.forEach(item => {
+          const charElement = document.createElement('div');
+          charElement.className = 'selected-char';
+          charElement.textContent = item.char;
+          charElement.title = "0x" + item.byte.toString(16).toUpperCase();
+          selectionChars.appendChild(charElement);
+        });
+        
+        // Enable/disable OK button
+        okBtn.disabled = selectedCharacters.length === 0;
+      }
+      
+      // Handle messages from extension
+      window.addEventListener('message', event => {
+        const message = event.data;
+        if (message.command === 'updateSelection') {
+          selectedCharacters = message.selection;
+          updateSelectionUI();
+        }
+      });
     
     // Keyboard navigation for the grid
     const cells = document.querySelectorAll('.grid-cell');
@@ -279,8 +422,32 @@ function getWebviewContent(gridData: Array<{ char: string; byte: number | null; 
           e.preventDefault();
           break;
         case 'Enter':
+          if (selectedCharacters.length > 0) {
+            vscode.postMessage({
+              command: 'confirmSelection'
+            });
+          } else {
+            // Add current cell character to selection
+            cells[currentIndex].click();
+          }
+          e.preventDefault();
+          break;
         case ' ':
           cells[currentIndex].click();
+          e.preventDefault();
+          break;
+        case 'Backspace':
+          if (selectedCharacters.length > 0) {
+            // Remove the latest selected character
+            selectedCharacters.pop();
+            updateSelectionUI();
+            
+            // Send update to extension
+            vscode.postMessage({
+              command: 'updateSelection',
+              selection: selectedCharacters
+            });
+          }
           e.preventDefault();
           break;
         case 'Escape':
@@ -309,4 +476,3 @@ export async function insertZxGraphicsCharacterAtPosition(
     editBuilder.insert(position, character);
   });
 }
-
