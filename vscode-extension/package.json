@@ -2,7 +2,7 @@
   "name": "zx-basic-vscode-extension",
   "repository": "git+https://github.com/stef/vs-zx.git",
   "displayName": "ZX BASIC Development Environment",
-  "version": "1.0.186",
+  "version": "1.0.190",
   "description": "VS Code extension for ZX Spectrum BASIC development with Interface 1 transfer",
   "license": "MIT",
   "icon": "icon.png",
@@ -122,6 +122,16 @@
         "title": "Insert ZX Graphics Character",
         "category": "ZX BASIC",
         "icon": "$(symbol-char)"
+      },
+      {
+        "command": "zx-basic.moveLineUp",
+        "title": "Move Line(s) Up with Renumbering",
+        "category": "ZX BASIC"
+      },
+      {
+        "command": "zx-basic.moveLineDown",
+        "title": "Move Line(s) Down with Renumbering",
+        "category": "ZX BASIC"
       }
     ],
     "menus": {
@@ -178,6 +188,14 @@
         },
         {
           "command": "zx-basic.insertZxGraphics",
+          "when": "editorLangId == zx-basic"
+        },
+        {
+          "command": "zx-basic.moveLineUp",
+          "when": "editorLangId == zx-basic"
+        },
+        {
+          "command": "zx-basic.moveLineDown",
           "when": "editorLangId == zx-basic"
         },
         {
@@ -272,6 +290,16 @@
           "when": "editorLangId == zx-basic && editorHasSelection",
           "group": "4_refactoring",
           "submenu": "Refactor..."
+        },
+        {
+          "command": "zx-basic.moveLineUp",
+          "when": "editorLangId == zx-basic",
+          "group": "6_movement"
+        },
+        {
+          "command": "zx-basic.moveLineDown",
+          "when": "editorLangId == zx-basic",
+          "group": "6_movement"
         },
         {
           "command": "zx-basic.insertZxGraphics",
@@ -402,6 +430,18 @@
           }
         }
       }
+    ],
+    "keybindings": [
+      {
+        "key": "alt+up",
+        "command": "zx-basic.moveLineUp",
+        "when": "editorLangId == zx-basic && editorTextFocus"
+      },
+      {
+        "key": "alt+down",
+        "command": "zx-basic.moveLineDown",
+        "when": "editorLangId == zx-basic && editorTextFocus"
+      }
     ]
   },
   "activationEvents": [
@@ -414,7 +454,9 @@
     "onCommand:zx-basic.stopZxRecording",
     "onCommand:zx-basic.loadFromMdr",
     "onCommand:zx-basic.insertZxGraphics",
-    "onCommand:zx-basic.saveToMdr"
+    "onCommand:zx-basic.saveToMdr",
+    "onCommand:zx-basic.moveLineUp",
+    "onCommand:zx-basic.moveLineDown"
   ],
   "main": "./out/extension.js",
   "scripts": {

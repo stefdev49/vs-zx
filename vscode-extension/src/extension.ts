@@ -31,6 +31,7 @@ import * as extractVariableCmd from "./commands/refactor/extractVariable";
 import * as renumberLinesCmd from "./commands/refactor/renumberLines";
 import * as extractSubroutineCmd from "./commands/refactor/extractSubroutine";
 import * as insertZxGraphicsCmd from "./commands/insertZxGraphics";
+import * as moveLineCmd from "./commands/moveLine";
 
 let client: LanguageClient;
 
@@ -272,6 +273,9 @@ export function activate(context: ExtensionContext) {
   context.subscriptions.push(extractVariableCmd.register());
   context.subscriptions.push(renumberLinesCmd.register());
   context.subscriptions.push(extractSubroutineCmd.register());
+
+  // Register line movement commands
+  context.subscriptions.push(...moveLineCmd.registerMoveLineCommands());
 
   // Register ZX graphics insertion command
   context.subscriptions.push(insertZxGraphicsCmd.register());
